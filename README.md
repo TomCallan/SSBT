@@ -42,10 +42,7 @@ A flexible, extensible backtesting framework for trading strategies in Python.
 - Built-in visualization tools
 
 ## Installation 🛠️
-
-```bash
-pip install pytradebacktest
-```
+ - TODO
 
 ## Quick Start 🚀
 
