@@ -1,14 +1,13 @@
 # SSBT 🚀
 
-[![PyPI version](https://badge.fury.io/py/pytradebacktest.svg)](https://badge.fury.io/py/pytradebacktest)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A flexible, extensible backtesting framework for trading strategies in Python.
 
 ```
-📦 pytradebacktest/
-├── 📂 pytradebacktest/
+📦 SSBT/
+├── 📂 SSBT/
 │   ├── 📄 __init__.py
 │   ├── 📄 backtester.py
 │   ├── 📄 position.py
@@ -17,14 +16,7 @@ A flexible, extensible backtesting framework for trading strategies in Python.
 │   ├── 📄 types.py
 │   └── 📄 utils.py
 ├── 📂 examples/
-│   ├── 📄 moving_average_crossover.py
-│   └── 📄 custom_strategy.py
-├── 📂 tests/
-│   ├── 📄 __init__.py
-│   ├── 📄 test_backtester.py
-│   ├── 📄 test_position.py
-│   ├── 📄 test_risk.py
-│   └── 📄 test_strategy.py
+│   ├── 📄 MovingAverageCrossover.py
 ├── 📄 setup.py
 ├── 📄 requirements.txt
 ├── 📄 LICENSE
@@ -42,14 +34,19 @@ A flexible, extensible backtesting framework for trading strategies in Python.
 - Built-in visualization tools
 
 ## Installation 🛠️
- - TODO
+Currently, SSBT is only available for installation by cloning the GitHub repository and using it directly:
+
+```bash
+git clone https://github.com/TomCallan/SSBT.git  
+cd SSBT
+```
 
 ## Quick Start 🚀
 
 Here's a simple example using a Moving Average Crossover strategy:
 
 ```python
-from pytradebacktest import Backtester, MovingAverageCrossover
+from SSBT import Backtester, MovingAverageCrossover
 import yfinance as yf
 
 # Get some data
@@ -85,14 +82,12 @@ Sharpe Ratio: 1.43
 Average Trade Duration: 3 days 14:23:11
 ```
 
-![Equity Curve](https://github.com/TomCallan/SSBT/raw/main/docs/images/equity_curve.png)
-
 ## Creating Custom Strategies 🎯
 
 Implementing your own strategy is straightforward:
 
 ```python
-from pytradebacktest import Strategy, Signal, SignalType
+from SSBT import Strategy, Signal, SignalType
 import pandas as pd
 
 class RSIStrategy(Strategy):
@@ -125,7 +120,7 @@ class RSIStrategy(Strategy):
 The framework includes built-in risk management features:
 
 ```python
-from pytradebacktest import RiskManager, PositionManager
+from SSBT import RiskManager, PositionManager
 
 # Configure risk parameters
 risk_manager = RiskManager(
@@ -150,7 +145,7 @@ backtester = Backtester(
 ## Performance Visualization 📈
 
 ```python
-from pytradebacktest.utils import plot_equity_curve
+from SSBT.utils import plot_equity_curve
 
 # Run backtest
 results = backtester.run()
