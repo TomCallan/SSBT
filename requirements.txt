@@ -1,0 +1,10 @@
+numpy>=1.19.0
+pandas>=1.2.0
+matplotlib>=3.3.0
+typing-extensions>=4.0.0
+pytest>=6.0
+pytest-cov>=2.0
+black>=21.0
+isort>=5.0
+mypy>=0.900
+flake8>=3.9
