@@ -1,0 +1,20 @@
+[project]
+name = "ssbt"
+version = "0.1.0"
+description = "Super Simple Backtesting Tool — minimal, performant, event-driven"
+requires-python = ">=3.10"
+dependencies = [
+    "polars>=0.20",
+    "numpy>=1.24",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+fast = ["numba>=0.58"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["ssbt*"]
