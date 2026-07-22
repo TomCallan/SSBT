@@ -1,21 +1,23 @@
-"""Parquet data feed — reads OHLCV or bid/ask data, emits events chronologically."""
+"""Data feed — Parquet or in-memory DataFrames, emits events chronologically.
+
+Performance: InMemoryFeed caches NumPy arrays. to_arrays() for engine fast path.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Iterator
 from typing import Union
 
+import numpy as np
 import polars as pl
 
 from ssbt.core.events import Bar, BidAsk
 
-# Column name mappings: lowercase normalised
 _BAR_COLUMNS = {"timestamp", "open", "high", "low", "close", "volume"}
 _BA_COLUMNS = {"timestamp", "bid", "ask"}
 
 
 def _detect_columns(df: pl.DataFrame, symbol: str) -> str:
-    """Detect whether DataFrame is bar or bid/ask based on columns present."""
     cols = {c.lower() for c in df.columns}
     if _BAR_COLUMNS.issubset(cols):
         return "bar"
@@ -28,11 +30,112 @@ def _detect_columns(df: pl.DataFrame, symbol: str) -> str:
     )
 
 
-class ParquetFeed:
-    """Reads one or more Parquet files and yields Bar or BidAsk events in chronological order.
+def _normalise_bar_df(df: pl.DataFrame) -> pl.DataFrame:
+    rename = {c: c.lower() for c in df.columns if c != c.lower()}
+    if rename:
+        df = df.rename(rename)
+    return df.select([
+        pl.col("timestamp"),
+        pl.col("open").cast(pl.Float64),
+        pl.col("high").cast(pl.Float64),
+        pl.col("low").cast(pl.Float64),
+        pl.col("close").cast(pl.Float64),
+        pl.col("volume").cast(pl.Float64),
+    ]).sort("timestamp")
 
-    Supports multi-symbol: pass dict of {symbol: path}.
-    All symbols are merged by timestamp and yielded in global time order.
+
+def _normalise_ba_df(df: pl.DataFrame) -> pl.DataFrame:
+    rename = {c: c.lower() for c in df.columns if c != c.lower()}
+    if rename:
+        df = df.rename(rename)
+    return df.select([
+        pl.col("timestamp"),
+        pl.col("bid").cast(pl.Float64),
+        pl.col("ask").cast(pl.Float64),
+    ]).sort("timestamp")
+
+
+class InMemoryFeed:
+    """Feed from a pre-loaded DataFrame. No Parquet I/O. Fastest for sweeps.
+
+    Accepts a single-symbol DataFrame with bar or bid/ask columns.
+    Optionally slice rows [start:end] for walk-forward windows.
+    """
+
+    def __init__(self, df: pl.DataFrame, symbol: str, start: int = 0, end: int | None = None):
+        self._symbol = symbol
+        self._dtype = _detect_columns(df, symbol)
+
+        if self._dtype == "bar":
+            df = _normalise_bar_df(df)
+        else:
+            df = _normalise_ba_df(df)
+
+        if start > 0 or end is not None:
+            df = df.slice(start, (end or len(df)) - start)
+
+        self._df = df
+        self._n = len(df)
+        self._cached_arrays: dict[str, np.ndarray] = {}
+        for col in df.columns:
+            self._cached_arrays[col] = df[col].to_numpy()
+
+    @property
+    def symbols(self) -> list[str]:
+        return [self._symbol]
+
+    @property
+    def dtype(self) -> str:
+        return self._dtype
+
+    @property
+    def n_bars(self) -> int:
+        return self._n
+
+    def get_dataframe(self, symbol: str | None = None) -> pl.DataFrame:
+        return self._df
+
+    def to_arrays(self) -> dict[str, np.ndarray]:
+        """Return raw NumPy arrays for engine fast path. No Bar/BidAsk object creation."""
+        return self._cached_arrays
+
+    def __iter__(self) -> Iterator[Union[Bar, BidAsk]]:
+        ts = self._cached_arrays["timestamp"]
+        sym = self._symbol
+
+        if self._dtype == "bar":
+            o = self._cached_arrays["open"]
+            h = self._cached_arrays["high"]
+            l = self._cached_arrays["low"]
+            c = self._cached_arrays["close"]
+            v = self._cached_arrays["volume"]
+            for i in range(self._n):
+                yield Bar(
+                    timestamp=int(ts[i]),
+                    symbol=sym,
+                    open=float(o[i]),
+                    high=float(h[i]),
+                    low=float(l[i]),
+                    close=float(c[i]),
+                    volume=float(v[i]),
+                )
+        else:
+            b = self._cached_arrays["bid"]
+            a = self._cached_arrays["ask"]
+            for i in range(self._n):
+                yield BidAsk(
+                    timestamp=int(ts[i]),
+                    symbol=sym,
+                    bid=float(b[i]),
+                    ask=float(a[i]),
+                )
+
+
+class ParquetFeed:
+    """Reads one or more Parquet files and yields Bar or BidAsk events.
+
+    For multi-symbol: pass dict of {symbol: path}.
+    For sweeps: prefer InMemoryFeed — load once, reuse across runs.
     """
 
     def __init__(self, path: str | dict[str, str], symbol: str | None = None):
@@ -45,83 +148,80 @@ class ParquetFeed:
         else:
             raise TypeError(f"path must be str or dict, got {type(path)}")
 
-    def __iter__(self) -> Iterator[Union[Bar, BidAsk]]:
-        # Load each source, detect type, collect as tagged rows
-        frames: list[tuple[str, str, pl.DataFrame]] = []
-        _types: dict[str, str] = {}
-
+        self._dfs: dict[str, pl.DataFrame] = {}
+        self._dtypes: dict[str, str] = {}
         for sym, p in self._sources.items():
             df = pl.read_parquet(p)
             dtype = _detect_columns(df, sym)
-            _types[sym] = dtype
-
+            self._dtypes[sym] = dtype
             if dtype == "bar":
-                df = df.select([
-                    pl.col("timestamp"),
-                    pl.col("open").cast(pl.Float64),
-                    pl.col("high").cast(pl.Float64),
-                    pl.col("low").cast(pl.Float64),
-                    pl.col("close").cast(pl.Float64),
-                    pl.col("volume").cast(pl.Float64),
-                ]).sort("timestamp")
+                df = _normalise_bar_df(df)
             else:
-                needed = {"timestamp", "bid", "ask"}
-                cols = {c.lower() for c in df.columns}
-                rename = {c: c.lower() for c in df.columns if c != c.lower()}
-                if rename:
-                    df = df.rename(rename)
-                missing = needed - {c.lower() for c in df.columns}
-                if missing:
-                    raise ValueError(f"Missing columns {missing} for {sym}")
-                df = df.select([
-                    pl.col("timestamp"),
-                    pl.col("bid").cast(pl.Float64),
-                    pl.col("ask").cast(pl.Float64),
-                ]).sort("timestamp")
+                df = _normalise_ba_df(df)
+            self._dfs[sym] = df
 
-            frames.append((sym, dtype, df))
+    @property
+    def symbols(self) -> list[str]:
+        return list(self._sources)
 
-        # Merge all frames by timestamp
-        tagged: list[tuple[int, str, str, pl.DataFrame]] = []
-        for sym, dtype, df in frames:
-            ts = df["timestamp"].to_numpy()
-            for i in range(len(df)):
-                tagged.append((int(ts[i]), sym, dtype, df.slice(i, 1)))
-
-        tagged.sort(key=lambda x: x[0])
-
-        for ts, sym, dtype, row in tagged:
-            if dtype == "bar":
-                yield Bar(
-                    timestamp=ts,
-                    symbol=sym,
-                    open=row["open"][0],
-                    high=row["high"][0],
-                    low=row["low"][0],
-                    close=row["close"][0],
-                    volume=row["volume"][0],
-                )
-            else:
-                yield BidAsk(
-                    timestamp=ts,
-                    symbol=sym,
-                    bid=row["bid"][0],
-                    ask=row["ask"][0],
-                )
+    @property
+    def dtypes(self) -> dict[str, str]:
+        return self._dtypes
 
     def get_dataframe(self, symbol: str | None = None) -> pl.DataFrame:
-        """Return the full DataFrame for a symbol (for precompute)."""
         if symbol is None and len(self._sources) == 1:
             symbol = next(iter(self._sources))
         if symbol is None or symbol not in self._sources:
             raise ValueError(
                 f"Unknown symbol {symbol}. Available: {list(self._sources)}"
             )
-        return pl.read_parquet(self._sources[symbol])
+        return self._dfs[symbol]
 
-    @property
-    def symbols(self) -> list[str]:
-        return list(self._sources)
+    def to_inmemory(self, symbol: str | None = None, start: int = 0, end: int | None = None) -> InMemoryFeed:
+        """Convert to InMemoryFeed for fast repeated iteration."""
+        if symbol is None and len(self._sources) == 1:
+            symbol = next(iter(self._sources))
+        if symbol is None or symbol not in self._sources:
+            raise ValueError(f"Unknown symbol {symbol}. Available: {list(self._sources)}")
+        return InMemoryFeed(self._dfs[symbol], symbol, start, end)
+
+    def __iter__(self) -> Iterator[Union[Bar, BidAsk]]:
+        if len(self._sources) == 1:
+            feed = InMemoryFeed(next(iter(self._dfs.values())), next(iter(self._sources)))
+            yield from feed
+            return
+
+        tagged: list[tuple[int, str, str]] = []
+        for sym, dtype in self._dtypes.items():
+            df = self._dfs[sym]
+            ts = df["timestamp"].to_numpy()
+            for i in range(len(df)):
+                tagged.append((int(ts[i]), sym, dtype))
+
+        tagged.sort(key=lambda x: x[0])
+
+        indices: dict[str, int] = {s: 0 for s in self._sources}
+        for ts, sym, dtype in tagged:
+            idx = indices[sym]
+            df = self._dfs[sym]
+            if dtype == "bar":
+                yield Bar(
+                    timestamp=ts,
+                    symbol=sym,
+                    open=float(df["open"][idx]),
+                    high=float(df["high"][idx]),
+                    low=float(df["low"][idx]),
+                    close=float(df["close"][idx]),
+                    volume=float(df["volume"][idx]),
+                )
+            else:
+                yield BidAsk(
+                    timestamp=ts,
+                    symbol=sym,
+                    bid=float(df["bid"][idx]),
+                    ask=float(df["ask"][idx]),
+                )
+            indices[sym] += 1
 
 
 def make_feed(path: str | dict[str, str], symbol: str | None = None) -> ParquetFeed:
