@@ -1,4 +1,4 @@
-# SSBT — Super Simple Backtesting Tool
+# SSBT — Super Speedy Backtesting Tool
 
 **Speed first.** SSBT exists because existing Python backtesters force a choice: fast but unrealistic (vectorised only, no proper order types), or realistic but slow (event-driven, no vectorised path). SSBT closes that gap — a Numba-accelerated engine that runs event-driven backtests at 300k+ bars/sec and vectorised backtests at 3.5M+ bars/sec, with full order type realism in both modes. Matrix sweeps pack thousands of parameter combinations into a single Numba kernel call. It's the fastest Python backtester that doesn't sacrifice market realism for speed.
 
