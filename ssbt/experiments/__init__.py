@@ -16,6 +16,12 @@ from ssbt.experiments.specs import (
 from ssbt.experiments.loader import load_experiment, LoaderError
 from ssbt.experiments.registry import Registry, RegistryError
 from ssbt.experiments.runner import run_experiment, RunnerError
+from ssbt.experiments.stats import (
+    bootstrap_ci,
+    event_count_diagnostics,
+    check_leakage,
+    compute_confidence_stats,
+)
 
 __all__ = [
     "AnalysisSpec",
@@ -35,4 +41,8 @@ __all__ = [
     "RegistryError",
     "run_experiment",
     "RunnerError",
+    "bootstrap_ci",
+    "event_count_diagnostics",
+    "check_leakage",
+    "compute_confidence_stats",
 ]

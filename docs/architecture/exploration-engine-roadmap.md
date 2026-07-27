@@ -21,7 +21,7 @@ M0 ████████████████ 100%  Baseline Preservation
 M1 ████████████████ 100%  Spec Foundation
 M2 ████████████████ 100%  Plugin Contracts
 M3 ████████████████ 100%  Vertical Slice
-M4 ░░░░░░░░░░░░░░░░   0%  Statistical Confidence
+M4 ████████████████ 100%  Statistical Confidence
 M5 ░░░░░░░░░░░░░░░░   0%  Reporting Suite
 M6 ░░░░░░░░░░░░░░░░   0%  Backtesting Integration
 M7 ░░░░░░░░░░░░░░░░   0%  Hardening & Scale
@@ -94,16 +94,20 @@ M7 ░░░░░░░░░░░░░░░░   0%  Hardening & Scale
 
 ---
 
-## M4 — Statistical Confidence
+## ~~M4 — Statistical Confidence~~ ✅
 **Goal:** improve interpretability and trust.
 
-**Scope:**
-- bootstrap confidence intervals
-- event count diagnostics
+**Delivered:**
+- `experiments/stats.py` — bootstrap confidence intervals (`bootstrap_ci`, `compute_confidence_stats`)
+- Event count diagnostics (`event_count_diagnostics`) with horizon/outcome counts and warnings
+- Anti-lookahead / data leakage checks (`check_leakage`) validating timestamps, future data access, horizon limits
+- Integrated into runner: `run_experiment()` automatically computes CI, diagnostics, and leakage when configured
+- Example config uses `analysis.confidence.method: bootstrap` with 2000 iterations, 95% CI
 
 **Achievement criteria:**
-- CI reported for key metrics
-- warning flags for low sample sizes
+- [x] CI reported for key metrics (mean, median, std, hit_rate)
+- [x] warning flags for low sample sizes (event counts, outcome per horizon)
+- [x] leakage checks pass (timestamps in data, no future access, horizon limits)
 
 ---
 

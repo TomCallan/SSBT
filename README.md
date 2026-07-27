@@ -86,15 +86,14 @@ M0 ████████████████ 100%  Baseline Preservation
 M1 ████████████████ 100%  Spec Foundation
 M2 ████████████████ 100%  Plugin Contracts
 M3 ████████████████ 100%  Vertical Slice
-M4 ░░░░░░░░░░░░░░░░   0%  Statistical Confidence
+M4 ████████████████ 100%  Statistical Confidence
 M5 ░░░░░░░░░░░░░░░░   0%  Reporting Suite
 M6 ░░░░░░░░░░░░░░░░   0%  Backtesting Integration
 M7 ░░░░░░░░░░░░░░░░   0%  Hardening & Scale
 ```
 
-### Remaining: M4–M7
+### Remaining: M5–M7
 
-- **M4** — bootstrap confidence intervals, event-count diagnostics, leakage checks.
 - **M5** — standardized artifact generation (CSV/JSON/Parquet), chart exports, run manifests.
 - **M6** — refactor backtesting to consume the same shared data/feature/event layer, map metrics into unified report model.
 - **M7** — performance profiling at scale, CI quality gates, expanded test matrix.

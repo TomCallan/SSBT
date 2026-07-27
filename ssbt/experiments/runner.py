@@ -17,6 +17,11 @@ import polars as pl
 from ssbt.data.feed import ParquetFeed
 from ssbt.experiments.loader import load_experiment, LoaderError
 from ssbt.experiments.registry import Registry
+from ssbt.experiments.stats import (
+    compute_confidence_stats,
+    event_count_diagnostics,
+    check_leakage,
+)
 from ssbt.events import VolumeSpike
 from ssbt.outcomes import ForwardReturn
 
@@ -253,7 +258,29 @@ def run_experiment(config_path: str | Path) -> dict[str, Any]:
     df = _load_data(spec)
     events = _run_events(df, spec, reg)
     outcomes = _run_outcomes(df, events, spec, reg)
+
+    # Compute basic statistics
     stats = _compute_statistics(outcomes, spec)
+
+    # Add confidence intervals if configured
+    if spec.analysis and spec.analysis.confidence and spec.analysis.confidence.method == "bootstrap":
+        ci_stats = compute_confidence_stats(outcomes, spec)
+        if ci_stats:
+            stats["confidence"] = ci_stats
+
+    # Add event count diagnostics
+    diagnostics = event_count_diagnostics(events, outcomes)
+    stats["diagnostics"] = diagnostics
+
+    # Add leakage checks
+    max_horizon = 0
+    if spec.outcomes:
+        for oc in spec.outcomes:
+            if oc.params and "horizons" in oc.params:
+                max_horizon = max(max_horizon, max(oc.params["horizons"]))
+    if max_horizon > 0:
+        leakage = check_leakage(df, events, outcomes, max_horizon)
+        stats["leakage"] = leakage
 
     output_dir = Path(spec.reporting.output_dir if spec.reporting else "artifacts")
     _write_artifacts(events, outcomes, stats, spec, output_dir)
