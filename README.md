@@ -85,16 +85,15 @@ Full schema documented at `docs/architecture/exploration-engine-yaml-spec.md`.
 M0 ████████████████ 100%  Baseline Preservation
 M1 ████████████████ 100%  Spec Foundation
 M2 ████████████████ 100%  Plugin Contracts
-M3 ░░░░░░░░░░░░░░░░   0%  Vertical Slice (volume_spike + forward_return runner)
-M4 ░░░░░░░░░░░░░░░░   0%  Statistical Confidence (bootstrap CIs)
-M5 ░░░░░░░░░░░░░░░░   0%  Reporting Suite (CSV/JSON/Parquet, charts)
-M6 ░░░░░░░░░░░░░░░░   0%  Backtesting Integration (unify with shared layer)
-M7 ░░░░░░░░░░░░░░░░   0%  Hardening & Scale (profiling, large datasets)
+M3 ████████████████ 100%  Vertical Slice
+M4 ░░░░░░░░░░░░░░░░   0%  Statistical Confidence
+M5 ░░░░░░░░░░░░░░░░   0%  Reporting Suite
+M6 ░░░░░░░░░░░░░░░░   0%  Backtesting Integration
+M7 ░░░░░░░░░░░░░░░░   0%  Hardening & Scale
 ```
 
-### Remaining: M3–M7
+### Remaining: M4–M7
 
-- **M3** — first concrete plugins (`volume_spike` event, `forward_return` outcome), a runner that wires registry → compute → output table, and a CLI entry point. This is the first end-to-end flow.
 - **M4** — bootstrap confidence intervals, event-count diagnostics, leakage checks.
 - **M5** — standardized artifact generation (CSV/JSON/Parquet), chart exports, run manifests.
 - **M6** — refactor backtesting to consume the same shared data/feature/event layer, map metrics into unified report model.
@@ -116,31 +115,31 @@ uv pip install -e ".[dev]"
 ### Run all tests
 
 ```bash
-uv run python -m pytest tests/ -v
+uv run python -m pytest ssbt/tests/ -v
 ```
 
 ### Run specific test suites
 
 ```bash
 # Plugin contracts (events + outcomes)
-uv run python -m pytest tests/test_events_base.py tests/test_outcomes_base.py -v
+uv run python -m pytest ssbt/tests/test_events_base.py ssbt/tests/test_outcomes_base.py -v
 
 # Registry dispatch
-uv run python -m pytest tests/test_registry.py -v
+uv run python -m pytest ssbt/tests/test_registry.py -v
 
 # Experiment specs (pydantic validation)
-uv run python -m pytest tests/test_experiment_specs.py -v
+uv run python -m pytest ssbt/tests/test_experiment_specs.py -v
 
 # YAML loader
-uv run python -m pytest tests/test_experiment_loader.py -v
+uv run python -m pytest ssbt/tests/test_experiment_loader.py -v
 
 # Baseline regression (legacy backtest preservation)
-uv run python -m pytest tests/test_backtest_regression.py -v
+uv run python -m pytest ssbt/tests/test_backtest_regression.py -v
 
 # All new exploration engine tests (excludes legacy)
-uv run python -m pytest tests/test_events_base.py tests/test_outcomes_base.py \
-                      tests/test_registry.py tests/test_experiment_specs.py \
-                      tests/test_experiment_loader.py -v
+uv run python -m pytest ssbt/tests/test_events_base.py ssbt/tests/test_outcomes_base.py \
+                      ssbt/tests/test_registry.py ssbt/tests/test_experiment_specs.py \
+                      ssbt/tests/test_experiment_loader.py -v
 ```
 
 ### Quick sanity: registry round-trip
@@ -171,7 +170,7 @@ print(result)
 ```python
 from ssbt.experiments.loader import load_experiment
 
-spec = load_experiment("experiments/examples/volume_spike.yaml")
+spec = load_experiment("ssbt/experiments/examples/volume_spike.yaml")
 print(spec.experiment.name)       # → "volume_spike_study"
 print(spec.events[0].name)        # → "volume_spike"
 ```
@@ -179,12 +178,12 @@ print(spec.events[0].name)        # → "volume_spike"
 ### Expected test counts
 
 ```
-tests/test_events_base.py         16 passed
-tests/test_outcomes_base.py       17 passed
-tests/test_registry.py            25 passed
-tests/test_experiment_specs.py     ? passed
-tests/test_experiment_loader.py    ? passed
-tests/test_backtest_regression.py  4 passed (baseline preserved)
+ssbt/tests/test_events_base.py         16 passed
+ssbt/tests/test_outcomes_base.py       17 passed
+ssbt/tests/test_registry.py            25 passed
+ssbt/tests/test_experiment_specs.py    32 passed
+ssbt/tests/test_experiment_loader.py   12 passed
+ssbt/tests/test_backtest_regression.py  4 passed (baseline preserved)
 ```
 
 ---

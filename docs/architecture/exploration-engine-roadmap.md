@@ -20,12 +20,14 @@ Build a generic research platform for market hypothesis testing where backtestin
 M0 ████████████████ 100%  Baseline Preservation
 M1 ████████████████ 100%  Spec Foundation
 M2 ████████████████ 100%  Plugin Contracts
-M3 ░░░░░░░░░░░░░░░░   0%  Vertical Slice
+M3 ████████████████ 100%  Vertical Slice
 M4 ░░░░░░░░░░░░░░░░   0%  Statistical Confidence
 M5 ░░░░░░░░░░░░░░░░   0%  Reporting Suite
 M6 ░░░░░░░░░░░░░░░░   0%  Backtesting Integration
 M7 ░░░░░░░░░░░░░░░░   0%  Hardening & Scale
 ```
+
+---
 
 ---
 
@@ -75,17 +77,20 @@ M7 ░░░░░░░░░░░░░░░░   0%  Hardening & Scale
 
 ---
 
-## M3 — Vertical Slice (First Real Study)
+## ~~M3 — Vertical Slice (First Real Study)~~ ✅
 **Goal:** ship volume spike vs forward return study.
 
-**Scope:**
-- `volume_spike` event
-- `forward_return` outcome
-- summary table + JSON
+**Delivered:**
+- `events/volume_spike.py` — `VolumeSpike` event plugin with rolling average detection
+- `outcomes/forward_return.py` — `ForwardReturn` outcome plugin with multi-horizon computation
+- `experiments/runner.py` — full experiment runner: load config → resolve plugins → run events → run outcomes → compute stats → write artifacts
+- CLI entry point: `ssbt run <config.yaml>` (via `ssbt.cli:main` and `ssbt-run` console script)
+- Example config: `experiments/examples/volume_spike.yaml`
+- Artifacts produced: events/outcomes CSVs, JSON, Parquet; `summary.json` with overall/by-horizon/by-outcome stats; `manifest.json`
 
 **Achievement criteria:**
-- single command run produces deterministic artifacts
-- grouped stats available by configured dimensions
+- [x] single command run produces deterministic artifacts
+- [x] grouped stats available by configured dimensions
 
 ---
 

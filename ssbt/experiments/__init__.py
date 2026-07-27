@@ -15,6 +15,7 @@ from ssbt.experiments.specs import (
 )
 from ssbt.experiments.loader import load_experiment, LoaderError
 from ssbt.experiments.registry import Registry, RegistryError
+from ssbt.experiments.runner import run_experiment, RunnerError
 
 __all__ = [
     "AnalysisSpec",
@@ -32,4 +33,6 @@ __all__ = [
     "LoaderError",
     "Registry",
     "RegistryError",
+    "run_experiment",
+    "RunnerError",
 ]

@@ -12,7 +12,7 @@ import pytest
 from ssbt.analytics.metrics import compute_metrics
 from ssbt.core.engine import Engine
 from ssbt.data.feed import ParquetFeed, InMemoryFeed
-from tests.conftest import _SmaCrossStrategy
+from ssbt.tests.conftest import _SmaCrossStrategy
 
 
 class TestBacktestDeterminism:
