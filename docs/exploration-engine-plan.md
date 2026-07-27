@@ -3,15 +3,14 @@
 ## Goal
 Evolve SSBT from a pure strategy backtesting system into a generic, event-driven market exploration engine where backtesting is one experiment type among many.
 
-### Example research question
-> "I want to test the relationship between large volume spikes and price moves."
+## Documentation Map (Comprehensive Planning)
 
-This plan introduces a research pipeline centered on:
-1. Data loading/alignment
-2. Event definitions
-3. Outcome definitions
-4. Experiment execution
-5. Statistical analysis/reporting
+- Architecture blueprint: `docs/architecture/exploration-engine-architecture.md`
+- YAML specification: `docs/architecture/exploration-engine-yaml-spec.md`
+- Roadmap/goals/achievements: `docs/architecture/exploration-engine-roadmap.md`
+- Quality and validation: `docs/architecture/exploration-engine-quality-and-validation.md`
+- Migration strategy: `docs/architecture/exploration-engine-migration-plan.md`
+- KPI framework: `docs/architecture/exploration-engine-kpis.md`
 
 ---
 
