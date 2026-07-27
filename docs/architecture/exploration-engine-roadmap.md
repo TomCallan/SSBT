@@ -14,46 +14,64 @@ Build a generic research platform for market hypothesis testing where backtestin
 
 ---
 
+## Progress Summary
+
+```
+M0 ████████████████ 100%  Baseline Preservation
+M1 ████████████████ 100%  Spec Foundation
+M2 ████████████████ 100%  Plugin Contracts
+M3 ░░░░░░░░░░░░░░░░   0%  Vertical Slice
+M4 ░░░░░░░░░░░░░░░░   0%  Statistical Confidence
+M5 ░░░░░░░░░░░░░░░░   0%  Reporting Suite
+M6 ░░░░░░░░░░░░░░░░   0%  Backtesting Integration
+M7 ░░░░░░░░░░░░░░░░   0%  Hardening & Scale
+```
+
+---
+
 ## Milestones
 
-## M0 — Baseline Preservation
+## ~~M0 — Baseline Preservation~~ ✅
 **Goal:** protect current SSBT functionality.
 
-**Scope:**
-- baseline tests
-- fixture datasets
-- execution flow docs
+**Delivered:**
+- baseline tests in `tests/test_backtest_regression.py`
+- fixture datasets in `tests/fixtures/generate_fixtures.py`
+- execution flow docs in `docs/current-backtest-flow.md`
 
 **Achievement criteria:**
-- all existing backtest tests green
-- no CLI behavior regressions
+- [x] all existing backtest tests green
+- [x] no CLI behavior regressions
 
 ---
 
-## M1 — Spec Foundation
+## ~~M1 — Spec Foundation~~ ✅
 **Goal:** introduce typed experiment specs.
 
-**Scope:**
-- YAML loader
-- schema validation
+**Delivered:**
+- YAML loader with `pyyaml`
+- schema validation via `pydantic`
 - defaults resolution
+- `experiments/spec.py` with `ExperimentSpec`, `ExperimentConfig`, `SpecLoader`
 
 **Achievement criteria:**
-- valid configs parse deterministically
-- invalid configs return actionable errors
+- [x] valid configs parse deterministically
+- [x] invalid configs return actionable errors
 
 ---
 
-## M2 — Plugin Contracts
+## ~~M2 — Plugin Contracts~~ ✅
 **Goal:** unify event/outcome extensibility.
 
-**Scope:**
-- event/outcome base interfaces
-- registry and dispatch
+**Delivered:**
+- `events/base.py` — `BaseEvent` ABC, `EventTableRow`, `REQUIRED_EVENT_COLUMNS`
+- `outcomes/base.py` — `BaseOutcome` ABC, `OutcomeRow`, `REQUIRED_OUTCOME_COLUMNS`
+- `experiments/registry.py` — `Registry` class, `RegistryError`
+- 54 tests across `test_events_base.py`, `test_outcomes_base.py`, `test_registry.py`
 
 **Achievement criteria:**
-- add a new event in one module without runner edits
-- add a new outcome in one module without runner edits
+- [x] add a new event in one module without runner edits
+- [x] add a new outcome in one module without runner edits
 
 ---
 

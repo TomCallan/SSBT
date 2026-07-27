@@ -2,6 +2,193 @@
 
 **Speed first.** SSBT exists because existing Python backtesters force a choice: fast but unrealistic (vectorised only, no proper order types), or realistic but slow (event-driven, no vectorised path). SSBT closes that gap — a Numba-accelerated engine that runs event-driven backtests at 300k+ bars/sec and vectorised backtests at 3.5M+ bars/sec, with full order type realism in both modes. Matrix sweeps pack thousands of parameter combinations into a single Numba kernel call. It's the fastest Python backtester that doesn't sacrifice market realism for speed.
 
+> **Branch: `dev-generic-exploration-engine-plan`**
+> This branch evolves SSBT from a backtesting-first engine into a **generic event-driven exploration engine** — a platform for market hypothesis testing where backtesting is one specialized capability. The backtesting core remains fully operational; new modules sit alongside it.
+
+---
+
+## What's Changed (Exploration Engine)
+
+### New package layout
+
+```
+ssbt/
+├── events/                 # M2 — Event plugin contracts
+│   └── base.py             #   BaseEvent ABC, EventTableRow, REQUIRED_EVENT_COLUMNS
+├── outcomes/               # M2 — Outcome plugin contracts
+│   └── base.py             #   BaseOutcome ABC, OutcomeRow, REQUIRED_OUTCOME_COLUMNS
+└── experiments/            # M1 — Spec foundation + M2 — Registry
+    ├── specs.py            #   pydantic models: ExperimentSpec, DatasetSpec, EventSpec, ...
+    ├── loader.py           #   load_experiment(), LoaderError — YAML → ExperimentSpec
+    └── registry.py         #   Registry, RegistryError — name→class dispatch
+
+tests/
+├── test_events_base.py     # 16 tests — contract, validation, schema checks
+├── test_outcomes_base.py   # 17 tests — contract, validation, multi-horizon
+├── test_registry.py        # 25 tests — register, get, duplicates, listing, integration
+├── test_experiment_specs.py
+├── test_experiment_loader.py
+├── test_backtest_regression.py  # baseline preservation (unchanged)
+└── fixtures/
+    └── generate_fixtures.py     # 1K-bar fixture dataset
+```
+
+### Delivered milestones
+
+| Milestone | Status | What it delivers |
+|-----------|--------|------------------|
+| M0 — Baseline Preservation | Done | Regression tests pin current backtest outputs; fixture generator; execution flow docs |
+| M1 — Spec Foundation | Done | pydantic-validated YAML specs with defaults resolution, loader, validation errors |
+| M2 — Plugin Contracts | Done | BaseEvent/BaseOutcome ABCs, Registry dispatch, 58 tests across all contract surfaces |
+
+### What each new module does
+
+- **`events/base.py`** — `BaseEvent(ABC)` with `compute_events(df, params) → pl.DataFrame`. Subclass it, define `name` and `compute_events`, register it, and the runner resolves it by name from the YAML config. Ships `EventTableRow` dataclass, `REQUIRED_EVENT_COLUMNS`, `check_event_table()` validator.
+
+- **`outcomes/base.py`** — `BaseOutcome(ABC)` with `compute_outcomes(df, events, params) → pl.DataFrame`. Same pattern. Ships `OutcomeRow`, `REQUIRED_OUTCOME_COLUMNS`, `check_outcome_table()`.
+
+- **`experiments/registry.py`** — `Registry` holds two name→class maps (events + outcomes). Methods: `register_event()`, `get_event()`, `list_events()`, `has_event()`, and mirrored outcome methods. Enforces concrete method presence, rejects empty names and duplicates.
+
+- **`experiments/specs.py`** — pydantic models: `ExperimentSpec`, `DatasetSpec`, `FeatureSpec`, `EventSpec`, `OutcomeSpec`, `FilterSpec`, `AnalysisSpec`, `ReportingSpec`, `ExecutionSpec`. Validates required fields, applies defaults, detects unknown keys.
+
+- **`experiments/loader.py`** — `load_experiment(path)` reads a YAML file, validates it, returns an `ExperimentSpec`. `LoaderError` for file/parse/validation failures.
+
+### What the YAML spec looks like
+
+```yaml
+version: 1
+experiment:
+  name: "volume_spike_study"
+  type: event_study
+
+dataset:
+  source: "data/sp500.parquet"
+  symbol: "SPY"
+  timeframe: "1d"
+
+events:
+  - name: "volume_spike"
+    params: { multiplier: 2.5 }
+
+outcomes:
+  - name: "forward_return"
+    params: { horizons: [1, 5, 20] }
+```
+
+Full schema documented at `docs/architecture/exploration-engine-yaml-spec.md`.
+
+---
+
+## What Still Needs Work
+
+```
+M0 ████████████████ 100%  Baseline Preservation
+M1 ████████████████ 100%  Spec Foundation
+M2 ████████████████ 100%  Plugin Contracts
+M3 ░░░░░░░░░░░░░░░░   0%  Vertical Slice (volume_spike + forward_return runner)
+M4 ░░░░░░░░░░░░░░░░   0%  Statistical Confidence (bootstrap CIs)
+M5 ░░░░░░░░░░░░░░░░   0%  Reporting Suite (CSV/JSON/Parquet, charts)
+M6 ░░░░░░░░░░░░░░░░   0%  Backtesting Integration (unify with shared layer)
+M7 ░░░░░░░░░░░░░░░░   0%  Hardening & Scale (profiling, large datasets)
+```
+
+### Remaining: M3–M7
+
+- **M3** — first concrete plugins (`volume_spike` event, `forward_return` outcome), a runner that wires registry → compute → output table, and a CLI entry point. This is the first end-to-end flow.
+- **M4** — bootstrap confidence intervals, event-count diagnostics, leakage checks.
+- **M5** — standardized artifact generation (CSV/JSON/Parquet), chart exports, run manifests.
+- **M6** — refactor backtesting to consume the same shared data/feature/event layer, map metrics into unified report model.
+- **M7** — performance profiling at scale, CI quality gates, expanded test matrix.
+
+Full plan at `docs/architecture/exploration-engine-roadmap.md` and staged PR breakdown at `docs/architecture/exploration-engine-migration-plan.md`.
+
+---
+
+## How to Test What's Been Delivered
+
+### Prerequisites
+
+```bash
+uv venv .venv
+uv pip install -e ".[dev]"
+```
+
+### Run all tests
+
+```bash
+uv run python -m pytest tests/ -v
+```
+
+### Run specific test suites
+
+```bash
+# Plugin contracts (events + outcomes)
+uv run python -m pytest tests/test_events_base.py tests/test_outcomes_base.py -v
+
+# Registry dispatch
+uv run python -m pytest tests/test_registry.py -v
+
+# Experiment specs (pydantic validation)
+uv run python -m pytest tests/test_experiment_specs.py -v
+
+# YAML loader
+uv run python -m pytest tests/test_experiment_loader.py -v
+
+# Baseline regression (legacy backtest preservation)
+uv run python -m pytest tests/test_backtest_regression.py -v
+
+# All new exploration engine tests (excludes legacy)
+uv run python -m pytest tests/test_events_base.py tests/test_outcomes_base.py \
+                      tests/test_registry.py tests/test_experiment_specs.py \
+                      tests/test_experiment_loader.py -v
+```
+
+### Quick sanity: registry round-trip
+
+```python
+from ssbt.experiments.registry import Registry
+from ssbt.events.base import BaseEvent
+import polars as pl
+
+class MyEvent(BaseEvent):
+    name = "demo"
+    def compute_events(self, df, params):
+        return pl.DataFrame({
+            "event_id": [1], "timestamp": [100],
+            "event_name": ["demo"], "symbol": [""], "event_meta": [{}],
+        })
+
+reg = Registry()
+reg.register_event("demo", MyEvent)
+cls = reg.get_event("demo")      # → MyEvent
+instance = cls()
+result = instance.compute_events(pl.DataFrame({"close": [1.0]}), {})
+print(result)
+```
+
+### Quick sanity: YAML spec load
+
+```python
+from ssbt.experiments.loader import load_experiment
+
+spec = load_experiment("experiments/examples/volume_spike.yaml")
+print(spec.experiment.name)       # → "volume_spike_study"
+print(spec.events[0].name)        # → "volume_spike"
+```
+
+### Expected test counts
+
+```
+tests/test_events_base.py         16 passed
+tests/test_outcomes_base.py       17 passed
+tests/test_registry.py            25 passed
+tests/test_experiment_specs.py     ? passed
+tests/test_experiment_loader.py    ? passed
+tests/test_backtest_regression.py  4 passed (baseline preserved)
+```
+
+---
+
 ## Features
 
 - **3.5M+ bars/sec vectorised** — Numba JIT, no event loop, market-order strategies
