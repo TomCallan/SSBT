@@ -4,67 +4,67 @@
 [![Performance](https://img.shields.io/badge/engine-Polars%20%7C%20Numba%20%7C%20Zero--Allocation-green.svg)]()
 [![Audit Status](https://img.shields.io/badge/audit-Anti--Lookahead%20Verified-brightgreen.svg)]()
 
-**SSBT** is an ultra-fast, event-driven quantitative backtesting and research engine engineered for traders, quantitative researchers, and automated strategy developers. Built on top of **Polars**, **NumPy**, and **Numba**, SSBT eliminates Python loop overhead while maintaining 100% causal execution integrity and strict anti-lookahead auditing.
+SSBT is an ultra-fast, event-driven quantitative backtesting and research engine engineered for traders, quantitative researchers, and automated strategy developers. Built on top of Polars, NumPy, and Numba, SSBT eliminates Python loop overhead while maintaining 100% causal execution integrity and strict anti-lookahead auditing.
 
 ---
 
-## 🚀 Key Quant Engine Capabilities
+## Key Quant Engine Capabilities
 
-- **Zero-Allocation Bar Execution Loop**: Pre-allocated memory structures eliminate per-bar object creation, delivering execution speeds over **1,000,000 bars/sec**.
-- **Anti-Lookahead Causal Audit System (`AuditLogger`)**: Built-in lineage tracing verifies that every order, fill, and metric calculation strictly respects temporal causality. Outputs SHA-256 integrity signatures for strategy validation.
-- **Prop Challenge Compliance Engine**: Evaluates systematic strategies against institutional prop firm rules (e.g. Velotrade $5k account rules: Max Daily Loss -$250, Max Total Loss -$500, +8% Target Equity).
-- **Multi-Ticker & Multi-Timeframe Matrix Framework**: Evaluates performance matrices across asset classes (Gold, Silver, Crude Oil, Crypto, Tech Stocks) and timeframes (`1d`, `1h`, `15m`).
-- **Real-Time Execution Stream (`ExecutionStreamPublisher`)**: Publishes JSON-lines events (`BAR`, `ORDER`, `FILL`, `TRADE`, `EQUITY`) over IPC / sockets for live GUI dashboards (Tkinter & Web browsers).
-- **Standardized Visual Reporting Suite**: Automated generation of performance heatmaps (`test_matrix_plot.png`) and multi-asset equity growth curves (`multi_equity_curves.png`).
+- Zero-Allocation Bar Execution Loop: Pre-allocated memory structures eliminate per-bar object creation, delivering execution speeds over 1,000,000 bars/sec.
+- Anti-Lookahead Causal Audit System (AuditLogger): Built-in lineage tracing verifies that every order, fill, and metric calculation strictly respects temporal causality. Outputs SHA-256 integrity signatures for strategy validation.
+- Prop Challenge Compliance Engine: Evaluates systematic strategies against institutional prop firm rules (e.g. Velotrade $5k account rules: Max Daily Loss -$250, Max Total Loss -$500, +8% Target Equity).
+- Multi-Ticker & Multi-Timeframe Matrix Framework: Evaluates performance matrices across asset classes (Gold, Silver, Crude Oil, Crypto, Tech Stocks) and timeframes (1d, 1h, 15m).
+- Real-Time Execution Stream (ExecutionStreamPublisher): Publishes JSON-lines events (BAR, ORDER, FILL, TRADE, EQUITY) over IPC / sockets for live GUI dashboards (Tkinter & Web browsers).
+- Standardized Visual Reporting Suite: Automated generation of performance heatmaps (test_matrix_plot.png) and multi-asset equity growth curves (multi_equity_curves.png).
 
 ---
 
-## 🏗 System Architecture & Mechanics
+## System Architecture & Mechanics
 
 ```
-  ┌─────────────────────────────────────────────────────────────┐
-  │                   External Market Data                      │
-  │          (yfinance, Parquet, CCXT, CSV, Polars)             │
-  └──────────────────────────────┬──────────────────────────────┘
-                                 │
-                                 ▼
-  ┌─────────────────────────────────────────────────────────────┐
-  │                 ssbt.data.feed.InMemoryFeed                 │
-  │           (Contiguous Arrow / Numba Column Arrays)           │
-  └──────────────────────────────┬──────────────────────────────┘
-                                 │
-                                 ▼
-  ┌─────────────────────────────────────────────────────────────┐
-  │                   ssbt.core.engine.Engine                   │
-  │       ┌──────────────────────────────────────────────┐      │
-  │       │ Single-Symbol & Multi-Symbol Fast Matching  │      │
-  │       └──────────────────────┬───────────────────────┘      │
-  │                              │                              │
-  │   ┌──────────────────────────┴──────────────────────────┐   │
-  │   │                                                     │   │
-  │   ▼                                                     ▼   │
-  │ ┌────────────────────────┐             ┌──────────────┐ │   │
-  │ │ ssbt.strategy.Strategy │             │  Portfolio   │ │   │
-  │ └────────────────────────┘             └──────────────┘ │   │
-  └──────────────────────────────┬──────────────────────────────┘
-                                 │
-             ┌───────────────────┴───────────────────┐
-             ▼                                       ▼
-  ┌──────────────────────┐               ┌──────────────────────┐
-  │   ssbt.analytics    │               │  ExecutionStream     │
-  │    .AuditLogger      │               │     Publisher        │
-  │ (Anti-Lookahead Causal│               │(Real-Time JSONL IPC  │
-  │      Audit Trail)    │               │    for GUIs / Web)   │
-  └──────────────────────┘               └──────────────────────┘
+  +-------------------------------------------------------------+
+  |                   External Market Data                      |
+  |          (yfinance, Parquet, CCXT, CSV, Polars)             |
+  +------------------------------+------------------------------+
+                                 |
+                                 v
+  +-------------------------------------------------------------+
+  |                 ssbt.data.feed.InMemoryFeed                 |
+  |           (Contiguous Arrow / Numba Column Arrays)          |
+  +------------------------------+------------------------------+
+                                 |
+                                 v
+  +-------------------------------------------------------------+
+  |                 ssbt.core.engine.Engine                     |
+  |       +----------------------------------------------+      |
+  |       | Single-Symbol & Multi-Symbol Fast Matching  |      |
+  |       +----------------------+-----------------------+      |
+  |                              |                              |
+  |   +--------------------------+--------------------------+   |
+  |   |                                                     |   |
+  |   v                                                     v   |
+  | +------------------------+             +--------------+ |   |
+  | | ssbt.strategy.Strategy |             |  Portfolio   | |   |
+  | +------------------------+             +--------------+ |   |
+  +------------------------------+------------------------------+
+                                 |
+             +-------------------+-------------------+
+             v                                       v
+  +----------------------+               +----------------------+
+  |   ssbt.analytics     |               |  ExecutionStream     |
+  |    .AuditLogger      |               |     Publisher        |
+  | (Anti-Lookahead Causal|               |(Real-Time JSONL IPC  |
+  |      Audit Trail)    |               |    for GUIs / Web)   |
+  +----------------------+               +----------------------+
 ```
 
 ---
 
-## 💻 Structural Examples & Usage Guides
+## Structural Examples & Usage Guides
 
-### 1. Writing a Quant Strategy (`Strategy` API)
+### 1. Writing a Quant Strategy (Strategy API)
 
-Strategies inherit from `ssbt.Strategy` and implement `on_bar()`. Use `self.is_flat(engine, symbol)` to verify position status before entry:
+Strategies inherit from ssbt.Strategy and implement on_bar(). Use self.is_flat(engine, symbol) to verify position status before entry:
 
 ```python
 import numpy as np
@@ -123,7 +123,7 @@ class TripleConfluenceStrategy(Strategy):
 
 ### 2. Running a Multi-Ticker & Multi-Timeframe Strategy Matrix
 
-Execute backtests across tickers (`GC=F`, `SI=F`, `CL=F`, `BTC-USD`) and timeframes (`1d`, `1h`), automatically generating matrix heatmaps:
+Execute backtests across tickers (GC=F, SI=F, CL=F, BTC-USD) and timeframes (1d, 1h), automatically generating matrix heatmaps:
 
 ```python
 import polars as pl
@@ -154,7 +154,7 @@ print(f"Final Equity: ${res['final_equity']:,.2f} | Sharpe: {res['metrics']['sha
 
 ### 3. Launching Real-Time GUIs (Desktop & Web)
 
-SSBT includes interactive GUIs in `gui_examples/`:
+SSBT includes interactive GUIs in gui_examples/:
 
 #### Interactive Tkinter Desktop GUI:
 ```bash
@@ -165,7 +165,7 @@ uv run python gui_examples/desktop_gui.py
 ```bash
 uv run python gui_examples/web_gui.py
 ```
-Open `http://localhost:8080` in any web browser to launch strategies live and view real-time HTML5 Canvas equity curves.
+Open http://localhost:8080 in any web browser to launch strategies live and view real-time HTML5 Canvas equity curves.
 
 ---
 
@@ -183,7 +183,7 @@ print(f"Audit Passed: {report.passed} | SHA-256: {report.sha256_hash}")
 
 ---
 
-## 🧪 Testing & Verification
+## Testing & Verification
 
 Run the full pytest suite (133 unit and integration tests):
 
@@ -199,7 +199,7 @@ uv run python examples/multi_ticker_timeframe_suite.py
 
 ---
 
-## 📂 Repository Layout
+## Repository Layout
 
 ```
 SSBT/
@@ -209,7 +209,7 @@ SSBT/
 │   ├── strategy/                 # Strategy Base Class & Position Helpers
 │   ├── analytics/                # AuditLogger, Metrics, Stream Publisher, Terminal
 │   └── experiments/              # Exploration Engine, Spec Parser & Charting
-├── gui_examples/                 # Real-time Interactive GUIs (Gitignored)
+├── gui_examples/                 # Real-time Interactive GUIs
 │   ├── desktop_gui.py            # Tkinter Desktop Quantitative Studio
 │   └── web_gui.py                # Web Browser Dashboard & HTTP API Server
 ├── strategies_vault/             # Proprietary Strategy Vault (Gitignored)
@@ -225,5 +225,5 @@ SSBT/
 
 ---
 
-## 📜 License
+## License
 MIT License. Engineered for quantitative trading, systematic strategy exploration, and prop challenge evaluation.

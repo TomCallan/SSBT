@@ -1,74 +1,58 @@
-# SSBT (Super Speedy Backtesting Tool) & Generic Exploration Engine
+# SSBT Quantitative Exploration Engine & Backtester Technical Reference
 
-> High-speed event-driven research platform for market hypothesis testing, event studies, and realistic algorithmic trading strategy backtesting.
+High-speed event-driven research platform for market hypothesis testing, event studies, real-time IPC execution streaming, and realistic algorithmic trading strategy backtesting.
 
 ## Overview & Architecture
 
 SSBT consists of two tightly coupled engines:
-1. **Generic Event Exploration Engine**: Evaluates market signals, event triggers, multi-horizon outcome profiles (1b, 5b, 10b, 20b, 50b forward returns), and statistical confidence (Bootstrap 1,000–2,000 iterations).
-2. **Numba High-Speed Backtesting Engine**: Executes single & multi-symbol event-driven trading strategies at 300k+ bars/sec and vectorised sweeps at 3.5M+ bars/sec. Supports Market, Limit, Stop, Stop-Limit, Trailing Stop, OCO, and TimeInForce (GTC, GTD, IOC, FOK, DAY).
+1. **Generic Event Exploration Engine**: Evaluates market signals, event triggers, multi-horizon outcome profiles (1b, 5b, 10b, 20b, 50b forward returns), and statistical confidence (Bootstrap 1,000-2,000 iterations).
+2. **Numba High-Speed Backtesting Engine**: Executes single & multi-symbol event-driven trading strategies at 1,000,000+ bars/sec and vectorised sweeps at 3.5M+ bars/sec. Supports Market, Limit, Stop, Stop-Limit, Trailing Stop, OCO, and TimeInForce (GTC, GTD, IOC, FOK, DAY).
 
 ## Data Ingestion Interface
 - **External Data**: SSBT does not download data internally. Data from `yfinance`, CCXT, Parquet, or SQL must be converted into Polars DataFrames.
 - **Required Columns**: `timestamp` (Int64, ns epoch), `symbol` (Utf8), `open` (Float64), `high` (Float64), `low` (Float64), `close` (Float64), `volume` (Float64).
 
-## Key Package Modules
+## Key Package Modules & Exports
 
-### 1. `ssbt.events.base` & `ssbt.events.volume_spike`
-- Abstract Base Class: `BaseEvent`
-- Subclasses implement `compute_events(df: pl.DataFrame, params: dict) -> pl.DataFrame`
-- Returns DataFrame with columns: `event_id`, `timestamp`, `symbol`, `diagnostics`.
-
-### 2. `ssbt.outcomes.base` & `ssbt.outcomes.forward_return`
-- Abstract Base Class: `BaseOutcome`
-- Subclasses implement `compute_outcomes(df: pl.DataFrame, events: pl.DataFrame, params: dict) -> pl.DataFrame`
-- Returns DataFrame with columns: `event_id`, `outcome_name`, `horizon`, `value`, `diagnostics`.
-
-### 3. `ssbt.experiments.runner` & `ssbt.experiments.specs`
-- `load_experiment(config_path)`: Parses YAML specs into `ExperimentSpec`.
-- `run_experiment(config_path)`: Runs full experiment pipeline and writes artifacts to `output_dir` (CSV, JSON, Parquet, charts, `manifest.json` with sha256 checksums).
-- CLI Command: `ssbt-run config.yaml` or `python -m ssbt.experiments.runner config.yaml`.
-
-### 4. `ssbt.strategy.base` & `ssbt.core.engine`
+### 1. `ssbt.strategy.base` & `ssbt.core.engine`
 - Strategy Base Class: `Strategy` with lifecycle methods: `on_init(engine)`, `on_bar(bar, engine)`, `on_finish(engine)`.
-- Orders: `self.market_order()`, `self.limit_order()`, `self.stop_order()`, `self.stop_limit_order()`, `Order(..., type=OrderType.TRAILING_STOP, trail_offset=...)`.
+- Position Helpers: `self.is_flat(engine, symbol) -> bool`, `self.get_position_qty(engine, symbol) -> float`.
+- Order Submission: `self.market_order()`, `self.limit_order()`, `self.stop_order()`, `self.stop_limit_order()`, `Order(..., type=OrderType.TRAILING_STOP, trail_offset=...)`.
 - Execution Engine: `Engine(feed, strategy, initial_cash)`. Runs single-pass Numba-accelerated event loop.
+
+### 2. `ssbt.analytics.stream` (Real-Time IPC Stream Publisher)
+- Class: `ExecutionStreamPublisher(log_path="artifacts/<run_id>/execution_stream.jsonl")`
+- Methods: `publish(event_type, timestamp, data)`, `subscribe(callback_fn)`
+- Events: `BAR`, `ORDER`, `FILL`, `TRADE`, `EQUITY` streamed to JSONL files or live subscriber callbacks for PySide/Tkinter/Web interfaces.
+
+### 3. `ssbt.analytics.audit` & `ssbt.analytics.terminal`
+- Audit Logger: `AuditLogger()` verifies causal timestamp ordering, anti-lookahead integrity (`verify_event_outcomes`, `verify_backtest`), and exports `audit_trail.json` with SHA-256 signatures.
+- Terminal Renderer: `display_experiment_summary()`, `display_backtest_summary()`, `display_audit_status()` render clean Rich tables directly in terminal without Textual GUI requirements.
+
+### 4. `ssbt.experiments.charts`
+- `generate_matrix_heatmap_chart(matrix_df, x_col, y_col, val_col, output_dir, name)`
+- `generate_multi_equity_curve_chart(equity_curves_dict, output_dir, name)`
 
 ### 5. `ssbt.backtest.adapter`
 - Class: `BacktestAdapter(initial_cash=100_000.0)`
 - Method: `run_backtest(feed, strategy) -> dict`
 - Standardizes metrics (Sharpe, Sortino, Calmar, Max Drawdown, Win Rate, Profit Factor) and trade DataFrames.
 
-### 6. `ssbt.analytics.audit` & `ssbt.analytics.terminal`
-- Audit Logger: `AuditLogger()` verifies causal timestamp ordering, anti-lookahead integrity (`verify_event_outcomes`, `verify_backtest`), and exports `audit_trail.json`.
-- Terminal Renderer: `display_experiment_summary()`, `display_backtest_summary()`, `display_audit_status()` render clean Rich tables and banners directly in terminal.
-
 ## Quickstart Code Snippet
 
 ```python
 import polars as pl
-from ssbt.events.volume_spike import VolumeSpike
-from ssbt.outcomes.forward_return import ForwardReturn
-from ssbt.analytics.audit import AuditLogger
-from ssbt.analytics.terminal import display_experiment_summary, display_audit_status
+from ssbt import Strategy, Side, Order, OrderType, OrderStatus, BacktestAdapter, InMemoryFeed, AuditLogger
 
-# 1. Prepare data
-df = pl.DataFrame({
-    "timestamp": [1000, 2000, 3000, 4000, 5000],
-    "symbol": ["SYNTH"] * 5,
-    "open": [100.0, 101.0, 102.0, 105.0, 104.0],
-    "high": [101.0, 102.0, 106.0, 106.0, 105.0],
-    "low": [99.0, 100.0, 101.0, 103.0, 103.0],
-    "close": [100.5, 101.5, 105.0, 104.0, 104.5],
-    "volume": [100.0, 100.0, 500.0, 150.0, 120.0],
-})
+class SampleStrategy(Strategy):
+    def on_bar(self, bar, engine):
+        if self.is_flat(engine, bar.symbol):
+            engine.submit_order(self.market_order(bar.symbol, Side.BUY, 1.0))
 
-# 2. Compute Events & Outcomes
-events = VolumeSpike().compute_events(df, {"window": 2, "multiplier": 2.0})
-outcomes = ForwardReturn().compute_outcomes(df, events, {"horizons": [1, 2]})
-
-# 3. Verify Execution Integrity
+feed = InMemoryFeed(df, symbol="GC=F")
+adapter = BacktestAdapter(initial_cash=5000.0)
+result = adapter.run_backtest(feed, SampleStrategy())
 logger = AuditLogger(verbose=False)
-audit_report = logger.generate_report(events=events, outcomes=outcomes)
-display_audit_status(audit_report)
+report = logger.generate_report(backtest_result=result["raw_result"])
+print(f"Final Equity: ${result['final_equity']:,.2f} | Audit Passed: {report.passed}")
 ```
