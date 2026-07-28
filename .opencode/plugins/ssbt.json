@@ -1,0 +1,9 @@
+{
+  "name": "ssbt-exploration-engine",
+  "version": "1.0.0",
+  "description": "OpenCode plugin for SSBT market exploration and high-speed backtesting",
+  "main": "llms.txt",
+  "skills": [
+    ".claude/skills/ssbt-exploration/SKILL.md"
+  ]
+}
