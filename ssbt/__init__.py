@@ -30,6 +30,21 @@ from ssbt.experiments.registry import Registry, RegistryError
 from ssbt.backtest.adapter import BacktestAdapter
 from ssbt.analytics.audit import AuditLogger, AuditReport
 from ssbt.analytics.stream import ExecutionStreamPublisher, StreamEvent
+from ssbt.analytics.robustness import (
+    deflated_sharpe_ratio,
+    probability_of_backtest_overfitting,
+    monte_carlo_trade_permutation,
+)
+from ssbt.execution.models import (
+    ImpactModel,
+    LiquidityCapModel,
+    BorrowCostModel,
+    RealisticExecutionEngine,
+)
+from ssbt.portfolio.risk import (
+    VolatilityTargetingOverlay,
+    StrategyCapacityAnalyzer,
+)
 from ssbt.analytics.terminal import (
     display_experiment_summary,
     display_backtest_summary,
@@ -44,7 +59,7 @@ from ssbt.experiments.charts import (
     generate_multi_equity_curve_chart,
 )
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     # Core Engine
@@ -64,9 +79,12 @@ __all__ = [
     "run_experiment", "RunnerError",
     "Registry", "RegistryError",
     "BacktestAdapter",
-    # Audit, Real-Time Stream, Charts & Terminal Displays
+    # Audit, Overfitting Defense, Microstructure & Terminal Displays
     "AuditLogger", "AuditReport",
     "ExecutionStreamPublisher", "StreamEvent",
+    "deflated_sharpe_ratio", "probability_of_backtest_overfitting", "monte_carlo_trade_permutation",
+    "ImpactModel", "LiquidityCapModel", "BorrowCostModel", "RealisticExecutionEngine",
+    "VolatilityTargetingOverlay", "StrategyCapacityAnalyzer",
     "generate_all_charts", "generate_matrix_heatmap_chart", "generate_multi_equity_curve_chart",
     "display_experiment_summary", "display_backtest_summary", "display_audit_status",
 ]
