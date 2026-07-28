@@ -29,10 +29,19 @@ from ssbt.experiments.runner import run_experiment, RunnerError
 from ssbt.experiments.registry import Registry, RegistryError
 from ssbt.backtest.adapter import BacktestAdapter
 from ssbt.analytics.audit import AuditLogger, AuditReport
+from ssbt.analytics.stream import ExecutionStreamPublisher, StreamEvent
 from ssbt.analytics.terminal import (
     display_experiment_summary,
     display_backtest_summary,
     display_audit_status,
+)
+from ssbt.experiments.charts import (
+    generate_all_charts,
+    generate_distribution_chart,
+    generate_grouped_bar_chart,
+    generate_event_timeline_chart,
+    generate_matrix_heatmap_chart,
+    generate_multi_equity_curve_chart,
 )
 
 __version__ = "0.4.0"
@@ -55,7 +64,9 @@ __all__ = [
     "run_experiment", "RunnerError",
     "Registry", "RegistryError",
     "BacktestAdapter",
-    # Audit & Terminal Displays
+    # Audit, Real-Time Stream, Charts & Terminal Displays
     "AuditLogger", "AuditReport",
+    "ExecutionStreamPublisher", "StreamEvent",
+    "generate_all_charts", "generate_matrix_heatmap_chart", "generate_multi_equity_curve_chart",
     "display_experiment_summary", "display_backtest_summary", "display_audit_status",
 ]

@@ -188,3 +188,80 @@ def generate_all_charts(
             results[chart_name] = f"ERROR: {e}"
 
     return results
+
+
+def generate_matrix_heatmap_chart(
+    matrix_df: pl.DataFrame,
+    x_col: str,
+    y_col: str,
+    val_col: str,
+    output_dir: Path,
+    name: str = "test_matrix_heatmap",
+) -> str:
+    """Generate a performance heatmap plot comparing metrics across timeframes and tickers."""
+    import pandas as pd
+    pivot = matrix_df.pivot(values=val_col, index=y_col, on=x_col)
+    y_labels = pivot[y_col].to_list()
+    x_labels = [c for c in pivot.columns if c != y_col]
+    matrix_data = pivot.select(x_labels).to_numpy()
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    im = ax.imshow(matrix_data, cmap="RdYlGn", aspect="auto")
+
+    ax.set_xticks(np.arange(len(x_labels)))
+    ax.set_yticks(np.arange(len(y_labels)))
+    ax.set_xticklabels(x_labels, rotation=45, ha="right")
+    ax.set_yticklabels(y_labels)
+
+    for i in range(len(y_labels)):
+        for j in range(len(x_labels)):
+            val = matrix_data[i, j]
+            text = f"{val:.2f}" if not np.isnan(val) else "N/A"
+            ax.text(j, i, text, ha="center", va="center", color="black", fontsize=9)
+
+    ax.set_title(f"Performance Heatmap ({val_col}) Across Tickers & Timeframes")
+    fig.colorbar(im, ax=ax)
+    plt.tight_layout()
+    return _save_plot(fig, output_dir, name)
+
+
+def _to_datetime_series(timestamps: np.ndarray):
+    """Convert array of timestamps (ns, ms, s) or bar indices to datetime objects or step indices."""
+    import pandas as pd
+    if len(timestamps) == 0:
+        return timestamps
+    first_val = float(timestamps[0])
+    if first_val > 1e16:
+        return pd.to_datetime(timestamps, unit="ns")
+    elif first_val > 1e12:
+        return pd.to_datetime(timestamps, unit="us")
+    elif first_val > 1e10:
+        return pd.to_datetime(timestamps, unit="ms")
+    elif first_val > 1e7:
+        return pd.to_datetime(timestamps, unit="s")
+    else:
+        return np.arange(len(timestamps))
+
+
+def generate_multi_equity_curve_chart(
+    equity_curves_dict: dict[str, np.ndarray],
+    output_dir: Path,
+    name: str = "multi_equity_curves",
+) -> str:
+    """Generate a combined multi-strategy / multi-asset equity curve comparison plot."""
+    import pandas as pd
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    for label, eq_arr in equity_curves_dict.items():
+        if len(eq_arr) > 0:
+            x_vals = _to_datetime_series(eq_arr[:, 0])
+            equities = eq_arr[:, 1]
+            ax.plot(x_vals, equities, label=label, linewidth=1.8)
+
+    ax.set_xlabel("Date / Bar Index")
+    ax.set_ylabel("Account Equity ($)")
+    ax.set_title("Multi-Strategy & Multi-Asset Equity Curve Comparison")
+    ax.legend(loc="upper left")
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    return _save_plot(fig, output_dir, name)

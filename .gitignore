@@ -8,6 +8,8 @@ env/
 dist/
 build/
 artifacts/
+gui_examples/
+strategies_vault/
 *.parquet
 !tests/data/*.parquet
 *.csv

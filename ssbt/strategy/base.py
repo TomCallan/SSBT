@@ -26,6 +26,16 @@ class Strategy(ABC):
         pass
 
     @staticmethod
+    def get_position_qty(engine, symbol: str) -> float:
+        pos = engine.portfolio.positions.get(symbol)
+        return pos.qty if pos else 0.0
+
+    @staticmethod
+    def is_flat(engine, symbol: str) -> bool:
+        pos = engine.portfolio.positions.get(symbol)
+        return pos.is_flat() if pos else True
+
+    @staticmethod
     def get_dataframe(engine, symbol: str | None = None) -> pl.DataFrame:
         return engine.feed.get_dataframe(symbol)
 
