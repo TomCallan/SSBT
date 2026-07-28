@@ -22,6 +22,12 @@ from ssbt.experiments.stats import (
     check_leakage,
     compute_confidence_stats,
 )
+from ssbt.experiments.charts import (
+    generate_distribution_chart,
+    generate_grouped_bar_chart,
+    generate_event_timeline_chart,
+    generate_all_charts,
+)
 
 __all__ = [
     "AnalysisSpec",
@@ -45,4 +51,8 @@ __all__ = [
     "event_count_diagnostics",
     "check_leakage",
     "compute_confidence_stats",
+    "generate_distribution_chart",
+    "generate_grouped_bar_chart",
+    "generate_event_timeline_chart",
+    "generate_all_charts",
 ]

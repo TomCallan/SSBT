@@ -1,0 +1,57 @@
+{
+  "experiment_name": "volume_spike_study",
+  "experiment_type": "event_study",
+  "generated_at": "2026-07-28T13:47:37.487753Z",
+  "artifacts": [
+    {
+      "name": "events.csv",
+      "checksum": "77adf89b1370afd0215027c0391cc5891fb1d8810d59819725d90e15280d9084",
+      "size": 16249
+    },
+    {
+      "name": "events.json",
+      "checksum": "09eed2b7ba31ccfea1c4b28fbb9e2303a2d6995ae40225e92cc7f62fc24edebe",
+      "size": 83953
+    },
+    {
+      "name": "events.parquet",
+      "checksum": "b4099331602c34287bb303d86084303f34c353690fa8f4282c406d3716863617",
+      "size": 16096
+    },
+    {
+      "name": "outcomes.csv",
+      "checksum": "6b671b47acd74afa098091c3ff82c1a9a3cccbb1f1b6dc9f0c87ea729ad73dcc",
+      "size": 69326
+    },
+    {
+      "name": "outcomes.json",
+      "checksum": "606454ac8e1cffb5a857706e576e99f29c34a35b20ee83c965d0e7780418fd25",
+      "size": 190059
+    },
+    {
+      "name": "outcomes.parquet",
+      "checksum": "f767fe00807c1947ff5516ebd537af79a14c4d119a2118ead74a1a0c02d65bc9",
+      "size": 16697
+    },
+    {
+      "name": "summary.json",
+      "checksum": "5f62e53ee79752a9b5718c220d5b399ba35361d69b88b05a0b530d312fa782c2",
+      "size": 9062
+    },
+    {
+      "name": "distribution.png",
+      "checksum": "4130f58e1684723266fb5431e6b3554e53907245013814b5e2807006e58b9b73",
+      "size": 119368
+    },
+    {
+      "name": "grouped_bar.png",
+      "checksum": "f9ce415ec031b0445c01f1e479428cb165e74d7207d1c5231135bcfbceb6f51f",
+      "size": 29804
+    },
+    {
+      "name": "event_timeline.png",
+      "checksum": "c1756ddcbe1e92b55b308d23fd4ed8105d5ba56bb804b4fbef227e42199c0a41",
+      "size": 278279
+    }
+  ]
+}

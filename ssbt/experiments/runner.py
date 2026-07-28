@@ -22,6 +22,7 @@ from ssbt.experiments.stats import (
     event_count_diagnostics,
     check_leakage,
 )
+from ssbt.experiments.charts import generate_all_charts
 from ssbt.events import VolumeSpike
 from ssbt.outcomes import ForwardReturn
 
@@ -195,21 +196,41 @@ def _write_artifacts(
             return df.drop(struct_cols)
         return df
 
+    import hashlib
+
+    def _checksum(path: Path) -> str:
+        with open(path, 'rb') as f:
+            return hashlib.sha256(f.read()).hexdigest()
+
+    artifact_info = []
+
     # Events
     if "csv" in formats:
-        _drop_struct_cols(events).write_csv(output_dir / "events.csv")
+        path = output_dir / "events.csv"
+        _drop_struct_cols(events).write_csv(path)
+        artifact_info.append({"name": "events.csv", "checksum": _checksum(path), "size": path.stat().st_size})
     if "json" in formats:
-        events.write_json(output_dir / "events.json")
+        path = output_dir / "events.json"
+        events.write_json(path)
+        artifact_info.append({"name": "events.json", "checksum": _checksum(path), "size": path.stat().st_size})
     if "parquet" in formats:
-        events.write_parquet(output_dir / "events.parquet")
+        path = output_dir / "events.parquet"
+        events.write_parquet(path)
+        artifact_info.append({"name": "events.parquet", "checksum": _checksum(path), "size": path.stat().st_size})
 
     # Outcomes
     if "csv" in formats:
-        _drop_struct_cols(outcomes).write_csv(output_dir / "outcomes.csv")
+        path = output_dir / "outcomes.csv"
+        _drop_struct_cols(outcomes).write_csv(path)
+        artifact_info.append({"name": "outcomes.csv", "checksum": _checksum(path), "size": path.stat().st_size})
     if "json" in formats:
-        outcomes.write_json(output_dir / "outcomes.json")
+        path = output_dir / "outcomes.json"
+        outcomes.write_json(path)
+        artifact_info.append({"name": "outcomes.json", "checksum": _checksum(path), "size": path.stat().st_size})
     if "parquet" in formats:
-        outcomes.write_parquet(output_dir / "outcomes.parquet")
+        path = output_dir / "outcomes.parquet"
+        outcomes.write_parquet(path)
+        artifact_info.append({"name": "outcomes.parquet", "checksum": _checksum(path), "size": path.stat().st_size})
 
     # Summary stats
     summary = {
@@ -221,17 +242,25 @@ def _write_artifacts(
         "statistics": stats,
     }
     if "json" in formats:
-        with open(output_dir / "summary.json", "w") as f:
+        path = output_dir / "summary.json"
+        with open(path, "w") as f:
             json.dump(summary, f, indent=2)
+        artifact_info.append({"name": "summary.json", "checksum": _checksum(path), "size": path.stat().st_size})
+
+    # Charts
+    if "charts" in stats:
+        for chart_name, chart_path in stats["charts"].items():
+            if chart_path and not chart_path.startswith("ERROR"):
+                path = output_dir / chart_path
+                if path.exists():
+                    artifact_info.append({"name": path.name, "checksum": _checksum(path), "size": path.stat().st_size})
 
     # Manifest
     manifest = {
         "experiment_name": spec.experiment_name,
         "experiment_type": spec.experiment_type,
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "artifacts": [
-            f.name for f in output_dir.iterdir() if f.is_file()
-        ],
+        "artifacts": artifact_info,
     }
     with open(output_dir / "manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
@@ -272,17 +301,12 @@ def run_experiment(config_path: str | Path) -> dict[str, Any]:
     diagnostics = event_count_diagnostics(events, outcomes)
     stats["diagnostics"] = diagnostics
 
-    # Add leakage checks
-    max_horizon = 0
-    if spec.outcomes:
-        for oc in spec.outcomes:
-            if oc.params and "horizons" in oc.params:
-                max_horizon = max(max_horizon, max(oc.params["horizons"]))
-    if max_horizon > 0:
-        leakage = check_leakage(df, events, outcomes, max_horizon)
-        stats["leakage"] = leakage
-
+    # Generate charts if configured
     output_dir = Path(spec.reporting.output_dir if spec.reporting else "artifacts")
+    if spec.reporting and spec.reporting.charts:
+        chart_results = generate_all_charts(events, outcomes, stats, spec, output_dir)
+        stats["charts"] = chart_results
+
     _write_artifacts(events, outcomes, stats, spec, output_dir)
 
     return {
