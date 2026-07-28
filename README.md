@@ -174,6 +174,31 @@ SSBT includes advanced market microstructure execution models and synthetic orde
 - `BorrowCostModel`: Calculates short position annualized borrow fee financing.
 - `RealisticExecutionEngine`: Combined execution wrapper.
 
+### 1. Multi-Resolution Cascading Orderbook Fallback (1h -> 1m -> 5m -> 15m -> Fallback)
+
+Trade low-resolution decision bars (e.g. 1-hour bars) using dynamic multi-resolution execution feeds (`apply_multi_resolution_sources`). When a higher-resolution feed (e.g. 1-minute data) runs out or has gaps, SSBT automatically falls back to the next best available resolution (5-minute, 15-minute, or 1-hour bar fallback):
+
+```python
+import polars as pl
+from ssbt import OrderBookEngine
+
+# User loads base 1-hour decision bars (data_1h) and high-res feeds (data_1m, data_5m, data_15m)
+quotes = OrderBookEngine.apply_multi_resolution_sources(
+    base_df=data_1h,
+    resolution_sources=[data_1m, data_5m, data_15m],  # Priority hierarchy
+    spread_pct=0.0002,
+    depth_levels=5,
+)
+
+# Convert generated L2 quotes into Polars DataFrame
+orderbook_df = OrderBookEngine.to_dataframe(quotes)
+```
+
+Run the multi-resolution cascading example:
+```bash
+uv run python examples/multi_resolution_orderbook_fallback_example.py
+```
+
 ### Arbitrary-Resolution Synthetic L2 Orderbook Reconstruction (`ssbt.data.orderbook`)
 Takes data of **any base resolution $x$** (e.g. 1d, 4h, 1h, 15m) and synthesizes multi-level L2 bid/ask depth quotes at **target resolution $y$** (e.g. 1m sub-bar ticks) using `OrderBookEngine.reconstruct(df, sub_bar_splits=N)`.
 

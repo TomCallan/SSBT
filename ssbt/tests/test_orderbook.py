@@ -1,4 +1,4 @@
-"""Unit tests for Orderbook Engine, multi-resolution L2 reconstruction, and worst-case execution ordering."""
+"""Unit tests for Orderbook Engine, multi-resolution L2 reconstruction, fallback feeds, and worst-case execution ordering."""
 
 import pytest
 import polars as pl
@@ -18,12 +18,31 @@ def test_rebuild_orderbook_from_bars():
         "volume": [1000.0, 1200.0],
     })
 
-    # Sub-bar splits = 10 (reconstruct 10 sub-ticks per bar)
     quotes = rebuild_orderbook_from_bars(df, sub_bar_splits=10, spread_pct=0.0002, depth_levels=5)
     assert len(quotes) == 20
     assert quotes[0].bid < quotes[0].ask
     assert len(quotes[0].bids) == 5
     assert len(quotes[0].asks) == 5
+
+
+def test_apply_multi_resolution_sources_fallback():
+    # Base 1-hour bars (timestamps 0, 3600000)
+    base_df = pl.DataFrame({
+        "timestamp": [0, 3600000],
+        "symbol": ["GC=F"] * 2,
+        "close": [2000.0, 2010.0],
+    })
+
+    # High-resolution 1-minute data for Hour 1 ONLY (timestamps 0 to 60000)
+    src_1m = pl.DataFrame({
+        "timestamp": [0, 60000, 120000],
+        "symbol": ["GC=F"] * 3,
+        "close": [2000.0, 2001.0, 2002.0],
+    })
+
+    # Apply fallback hierarchy: 1m feed for Hour 1, fallback to 1h bar for Hour 2
+    quotes = OrderBookEngine.apply_multi_resolution_sources(base_df, resolution_sources=[src_1m])
+    assert len(quotes) == 4  # 3 quotes from 1m data + 1 quote from 1h fallback
 
 
 def test_orderbook_engine_to_dataframe():

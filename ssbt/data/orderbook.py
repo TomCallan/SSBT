@@ -136,6 +136,69 @@ class OrderBookEngine:
         )
 
     @staticmethod
+    def apply_multi_resolution_sources(
+        base_df: pl.DataFrame,
+        resolution_sources: list[pl.DataFrame],
+        spread_pct: float = 0.0002,
+        depth_levels: int = 5,
+    ) -> list[OrderBookQuote]:
+        """Apply multi-resolution fallback data feeds to base decision bars.
+        
+        Evaluates time windows of base_df (e.g. 1-hour bars). For each window, uses the highest-priority
+        resolution source available (e.g. 1-min -> 5-min -> 15-min -> 1-hour fallback).
+        """
+        if base_df.is_empty():
+            return []
+
+        all_quotes: list[OrderBookQuote] = []
+        base_sorted = base_df.sort("timestamp")
+        base_ts = base_sorted["timestamp"].to_list()
+
+        n_base = len(base_ts)
+        step_delta = 3600_000
+        if n_base > 1:
+            step_delta = max(int((base_ts[-1] - base_ts[0]) / (n_base - 1)), 1)
+
+        for i in range(n_base):
+            t_start = base_ts[i]
+            t_end = t_start + step_delta
+
+            matched_quotes = None
+
+            # Try higher-resolution sources in priority order
+            for src_df in resolution_sources:
+                if src_df is None or src_df.is_empty():
+                    continue
+                
+                # Filter rows in current time window [t_start, t_end)
+                window_df = src_df.filter(
+                    (pl.col("timestamp") >= t_start) & (pl.col("timestamp") < t_end)
+                )
+
+                if window_df.height > 0:
+                    matched_quotes = rebuild_orderbook_from_bars(
+                        window_df,
+                        sub_bar_splits=1,
+                        spread_pct=spread_pct,
+                        depth_levels=depth_levels,
+                    )
+                    break
+
+            # Fallback: If no higher-resolution source matched, use base bar
+            if matched_quotes is None:
+                single_bar_df = base_sorted.slice(i, 1)
+                matched_quotes = rebuild_orderbook_from_bars(
+                    single_bar_df,
+                    sub_bar_splits=1,
+                    spread_pct=spread_pct,
+                    depth_levels=depth_levels,
+                )
+
+            all_quotes.extend(matched_quotes)
+
+        return all_quotes
+
+    @staticmethod
     def to_dataframe(quotes: list[OrderBookQuote]) -> pl.DataFrame:
         """Convert OrderBookQuote objects into a clean Polars DataFrame."""
         if not quotes:
