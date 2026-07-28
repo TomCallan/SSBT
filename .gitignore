@@ -7,6 +7,7 @@ venv/
 env/
 dist/
 build/
+artifacts/
 *.parquet
 !tests/data/*.parquet
 *.csv

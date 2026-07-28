@@ -1,4 +1,4 @@
-"""SSBT — Super Simple Backtesting Tool."""
+"""SSBT — Super Speedy Backtesting Tool & Generic Exploration Engine."""
 
 from ssbt.core.engine import Engine, BacktestResult
 from ssbt.core.events import (
@@ -21,10 +21,24 @@ from ssbt.analytics.optimization import (
     BaseOptimizer, GridSearch,
 )
 from ssbt.analytics.metrics import compute_metrics, format_metrics
+from ssbt.events.base import BaseEvent
+from ssbt.outcomes.base import BaseOutcome
+from ssbt.experiments.specs import ExperimentSpec
+from ssbt.experiments.loader import load_experiment, LoaderError
+from ssbt.experiments.runner import run_experiment, RunnerError
+from ssbt.experiments.registry import Registry, RegistryError
+from ssbt.backtest.adapter import BacktestAdapter
+from ssbt.analytics.audit import AuditLogger, AuditReport
+from ssbt.analytics.terminal import (
+    display_experiment_summary,
+    display_backtest_summary,
+    display_audit_status,
+)
 
 __version__ = "0.4.0"
 
 __all__ = [
+    # Core Engine
     "Engine", "BacktestResult", "MultiSymbolEngine",
     "VectorisedBacktester", "VectorisedStrategy",
     "ParquetFeed", "InMemoryFeed", "MatchingEngine", "Portfolio", "Strategy",
@@ -35,4 +49,13 @@ __all__ = [
     "walk_forward", "WalkForwardResult", "WalkForwardWindow",
     "BaseOptimizer", "GridSearch",
     "compute_metrics", "format_metrics", "HAS_NUMBA",
+    # Exploration Engine & Plugins
+    "BaseEvent", "BaseOutcome", "ExperimentSpec",
+    "load_experiment", "LoaderError",
+    "run_experiment", "RunnerError",
+    "Registry", "RegistryError",
+    "BacktestAdapter",
+    # Audit & Terminal Displays
+    "AuditLogger", "AuditReport",
+    "display_experiment_summary", "display_backtest_summary", "display_audit_status",
 ]
