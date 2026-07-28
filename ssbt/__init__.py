@@ -20,7 +20,8 @@ from ssbt.analytics.optimization import (
     walk_forward, WalkForwardResult, WalkForwardWindow,
     BaseOptimizer, GridSearch,
 )
-from ssbt.analytics.metrics import compute_metrics, format_metrics
+from ssbt.analytics.metrics import compute_metrics, format_metrics, compute_tradingview_overview
+from ssbt.analytics.plots import plot_equity_curve, plot_drawdown, plot_trades, plot_tradingview_dashboard
 from ssbt.events.base import BaseEvent
 from ssbt.outcomes.base import BaseOutcome
 from ssbt.experiments.specs import ExperimentSpec

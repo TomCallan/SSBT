@@ -107,3 +107,103 @@ def plot_trades(
         return None
     plt.show()
     return fig
+
+
+def plot_tradingview_dashboard(
+    prices: np.ndarray,
+    equity_curve: np.ndarray,
+    trades: list[Trade],
+    dates: list | np.ndarray | None = None,
+    title: str = "TradingView Strategy Tester Dashboard",
+    initial_cash: float = 5000.0,
+    save_path: str | None = None,
+):
+    """Plot complete 4-panel TradingView Strategy Tester Dashboard.
+    
+    Panel 1: Price Chart + Indicator Overlays + Trade Entry/Exit Markers
+    Panel 2: Account Equity Curve vs Buy-and-Hold Benchmark
+    Panel 3: Underwater Drawdown Area Fill Chart (%)
+    Panel 4: Per-Trade PnL Distribution Bars
+    """
+    plt = _import_mpl()
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(
+        4, 1, figsize=(14, 12), sharex=True,
+        gridspec_kw={"height_ratios": [3, 2, 1.5, 1.5]}
+    )
+
+    n_bars = len(prices)
+    x_axis = dates if dates is not None and len(dates) == n_bars else np.arange(n_bars)
+
+    # --- Panel 1: Price & Entry/Exit Markers ---
+    ax1.plot(x_axis, prices, label="Asset Price ($)", color="#1E88E5", linewidth=1.5)
+    
+    # Calculate 20-period EMA overlay
+    if n_bars >= 20:
+        ema_20 = np.convolve(prices, np.ones(20)/20, mode="valid")
+        ema_x = x_axis[19:]
+        ax1.plot(ema_x, ema_20, label="EMA(20)", color="#FFC107", linestyle="--", linewidth=1.2)
+
+    # Plot Trade Entry & Exit Markers
+    for t in trades:
+        e_idx = min(int(t.entry_time), n_bars - 1)
+        x_idx = min(int(t.exit_time), n_bars - 1)
+        
+        entry_x = x_axis[e_idx]
+        exit_x = x_axis[x_idx]
+        
+        ax1.scatter(entry_x, prices[e_idx], color="#2E7D32", marker="^", s=90, zorder=6, label="Buy Long" if "Buy Long" not in ax1.get_legend_handles_labels()[1] else "")
+        ax1.scatter(exit_x, prices[x_idx], color="#C62828", marker="v", s=90, zorder=6, label="Sell Exit" if "Sell Exit" not in ax1.get_legend_handles_labels()[1] else "")
+
+    ax1.set_ylabel("Price ($)", fontweight="bold")
+    ax1.set_title(title, fontsize=14, fontweight="bold", pad=10)
+    ax1.legend(loc="upper left", framealpha=0.8)
+    ax1.grid(True, alpha=0.25)
+
+    # --- Panel 2: Account Equity vs Buy & Hold ---
+    ts_eq = equity_curve[:, 0]
+    equity_vals = equity_curve[:, 1]
+    eq_x = dates[:len(equity_vals)] if dates is not None and len(dates) >= len(equity_vals) else np.arange(len(equity_vals))
+
+    bnh_equity = initial_cash * (prices[:len(equity_vals)] / prices[0])
+    
+    ax2.plot(eq_x, equity_vals, label="Strategy Account Equity ($)", color="#2E7D32", linewidth=2.0)
+    ax2.fill_between(eq_x, equity_vals, initial_cash, color="#2E7D32", alpha=0.12)
+    ax2.plot(eq_x, bnh_equity, label="Buy & Hold Benchmark ($)", color="#757575", linestyle=":", linewidth=1.5)
+    ax2.axhline(initial_cash, color="#757575", linestyle="--", alpha=0.5, label=f"Initial Capital (${initial_cash:,.0f})")
+    
+    ax2.set_ylabel("Account Equity ($)", fontweight="bold")
+    ax2.legend(loc="upper left", framealpha=0.8)
+    ax2.grid(True, alpha=0.25)
+
+    # --- Panel 3: Underwater Drawdown Chart (%) ---
+    peaks = np.maximum.accumulate(equity_vals)
+    drawdowns_pct = (equity_vals - peaks) / peaks * 100.0
+
+    ax3.fill_between(eq_x, drawdowns_pct, 0, color="#C62828", alpha=0.35, label="Drawdown Depth (%)")
+    ax3.plot(eq_x, drawdowns_pct, color="#C62828", linewidth=1.0)
+    ax3.set_ylabel("Drawdown (%)", fontweight="bold")
+    ax3.legend(loc="lower left", framealpha=0.8)
+    ax3.grid(True, alpha=0.25)
+
+    # --- Panel 4: Per-Trade PnL Bar Chart ($) ---
+    if trades:
+        trade_exit_indices = [min(int(t.exit_time), n_bars - 1) for t in trades]
+        trade_exit_x = [x_axis[i] for i in trade_exit_indices]
+        trade_pnls = [t.pnl for t in trades]
+        bar_colors = ["#2E7D32" if p >= 0 else "#C62828" for p in trade_pnls]
+
+        ax4.bar(trade_exit_x, trade_pnls, color=bar_colors, width=1.5, label="Trade PnL ($)", zorder=4)
+        ax4.axhline(0.0, color="#424242", linewidth=1.0)
+
+    ax4.set_ylabel("Trade PnL ($)", fontweight="bold")
+    ax4.set_xlabel("Time", fontweight="bold")
+    ax4.legend(loc="upper left", framealpha=0.8)
+    ax4.grid(True, alpha=0.25)
+
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=150)
+        plt.close()
+        return None
+    plt.show()
+    return fig

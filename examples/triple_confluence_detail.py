@@ -1,12 +1,14 @@
-"""Triple Confluence Strategy Master Verification & Multi-Timeframe Matrix Suite.
+"""Triple Confluence Strategy Master Verification, TradingView Dashboard & Multi-Timeframe Matrix Suite.
 
 This script executes the complete production quantitative workflow:
 1. Downloads multi-resolution market data (5m, 15m, 1h, 1d) across a ticker matrix via yfinance.
 2. Merges multi-resolution DataFrames into forward-filled UniversalTickStream objects.
 3. Evaluates TripleConfluenceStrategy across a decision timeframe matrix (5m, 1h, 4h, 1d).
 4. Evaluates worst-case adverse execution matching ("fills against position then for").
-5. Computes statistical overfitting defenses: Deflated Sharpe Ratio (DSR), Probability of Backtest Overfitting (PBO), and Monte Carlo 1,000 trade resampling.
-6. Renders matrix results tables, saves equity charts, and emits SHA-256 signed audit trails.
+5. Computes TradingView Strategy Tester Overview metrics (Net Profit, Profit Factor, Win Rate, Payoff Ratio, Max Consecutive Wins/Losses).
+6. Computes statistical overfitting defenses: Deflated Sharpe Ratio (DSR), Probability of Backtest Overfitting (PBO), and Monte Carlo 1,000 trade resampling.
+7. Renders multi-panel TradingView dashboard charts (Price + Trade Markers, Equity vs Benchmark, Underwater Drawdown Area Fill, Per-Trade PnL Bars) saved to artifacts/tradingview_strategy_tester.png.
+8. Emits SHA-256 signed audit trails and simulation assumptions reports.
 """
 
 import sys
@@ -27,6 +29,8 @@ from ssbt.data.universal_tick import UniversalTickStream, UniversalTickFeed
 from ssbt.core.matching import MatchingEngine
 from ssbt.backtest.adapter import BacktestAdapter
 from ssbt.analytics.audit import AuditLogger
+from ssbt.analytics.metrics import compute_tradingview_overview
+from ssbt.analytics.plots import plot_tradingview_dashboard
 from ssbt.analytics.robustness import (
     deflated_sharpe_ratio, probability_of_backtest_overfitting, monte_carlo_trade_permutation
 )
@@ -178,8 +182,8 @@ class TripleConfluenceStrategy(Strategy):
 def main():
     console.print()
     console.print(Panel.fit(
-        "[bold cyan]TRIPLE CONFLUENCE STRATEGY MASTER MATRIX & ROBUSTNESS SUITE[/bold cyan]\n"
-        "[dim]Multi-Ticker x Multi-Timeframe Matrix Sweep | Universal Tick Stream Merging | Overfitting Defense[/dim]",
+        "[bold cyan]TRIPLE CONFLUENCE STRATEGY — TRADINGVIEW DASHBOARD & MATRIX SUITE[/bold cyan]\n"
+        "[dim]Multi-Ticker x Multi-Timeframe Sweep | TradingView Strategy Tester Overview | 4-Panel Plot Dashboard[/dim]",
         border_style="cyan"
     ))
 
@@ -190,6 +194,8 @@ def main():
     matrix_results = []
     returns_matrix_list = []
     all_trade_pnls = []
+
+    primary_res = None
 
     # Iterate through Ticker Matrix
     for symbol in tickers:
@@ -217,6 +223,9 @@ def main():
         strategy = TripleConfluenceStrategy()
         adapter = BacktestAdapter(initial_cash=initial_cash)
         result = adapter.run_backtest(feed, strategy)
+
+        if symbol == "GC=F":
+            primary_res = (pl_1d, result)
 
         raw_res = result["raw_result"]
         metrics = result["metrics"]
@@ -288,7 +297,58 @@ def main():
     console.print()
 
     # -------------------------------------------------------------------------
-    # 4. INSTITUTIONAL OVERFITTING DEFENSE SUITE (DSR, PBO, MONTE CARLO)
+    # 4. TRADINGVIEW STRATEGY TESTER OVERVIEW METRICS
+    # -------------------------------------------------------------------------
+    if primary_res is not None:
+        pl_1d_primary, primary_backtest = primary_res
+        tv_metrics = compute_tradingview_overview(
+            equity_curve=primary_backtest["raw_result"].equity_curve,
+            trades=primary_backtest["raw_result"].trades,
+            initial_cash=initial_cash,
+        )
+
+        tv_table = Table(title="TradingView Strategy Tester Overview (Gold GC=F)", header_style="bold green", border_style="dim")
+        tv_table.add_column("TradingView Metric", style="cyan")
+        tv_table.add_column("Value ($ / %)", justify="right", style="bold white")
+
+        pnl_col = "green" if tv_metrics["net_profit"] >= 0 else "red"
+        tv_table.add_row("Net Profit", f"[{pnl_col}]${tv_metrics['net_profit']:,.2f} ({tv_metrics['net_profit_pct']:.2f}%)[/{pnl_col}]")
+        tv_table.add_row("Gross Profit", f"${tv_metrics['gross_profit']:,.2f}")
+        tv_table.add_row("Gross Loss", f"-${tv_metrics['gross_loss']:,.2f}")
+        tv_table.add_row("Profit Factor", f"{tv_metrics['profit_factor']:.2f}")
+        tv_table.add_row("Max Drawdown", f"-{abs(tv_metrics['max_drawdown']*100):.2f}%")
+        tv_table.add_row("Total Closed Trades", str(tv_metrics["total_trades"]))
+        tv_table.add_row("Percent Profitable (Win Rate)", f"{tv_metrics['win_rate']:.1f}%")
+        tv_table.add_row("Average Trade PnL", f"${tv_metrics['avg_trade']:,.2f}")
+        tv_table.add_row("Average Win / Average Loss", f"${tv_metrics['avg_win']:,.2f} / ${tv_metrics['avg_loss']:,.2f}")
+        tv_table.add_row("Payoff Ratio (Avg Win / Avg Loss)", f"{tv_metrics['payoff_ratio']:.2f}")
+        tv_table.add_row("Sharpe Ratio", f"{tv_metrics['sharpe']:.2f}")
+        tv_table.add_row("Sortino Ratio", f"{tv_metrics['sortino']:.2f}")
+        tv_table.add_row("Calmar Ratio", f"{tv_metrics['calmar']:.2f}")
+        tv_table.add_row("Max Consecutive Wins / Losses", f"{tv_metrics['max_consecutive_wins']} / {tv_metrics['max_consecutive_losses']}")
+
+        console.print(tv_table)
+        console.print()
+
+        # Render 4-Panel TradingView Dashboard Plot
+        output_dir = Path("artifacts")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        tv_chart_path = output_dir / "tradingview_strategy_tester.png"
+
+        plot_tradingview_dashboard(
+            prices=pl_1d_primary["close"].to_numpy(),
+            equity_curve=primary_backtest["raw_result"].equity_curve,
+            trades=primary_backtest["raw_result"].trades,
+            title="TradingView Strategy Tester — Gold (GC=F) Multi-Panel Dashboard",
+            initial_cash=initial_cash,
+            save_path=str(tv_chart_path),
+        )
+
+        console.print(f"[bold green][PASS] Saved TradingView 4-Panel Plot Dashboard to:[/bold green] [bold cyan]{tv_chart_path.resolve()}[/bold cyan]")
+        console.print()
+
+    # -------------------------------------------------------------------------
+    # 5. INSTITUTIONAL OVERFITTING DEFENSE SUITE (DSR, PBO, MONTE CARLO)
     # -------------------------------------------------------------------------
     console.print(Panel.fit("[bold yellow]INSTITUTIONAL OVERFITTING DEFENSE & AUDIT EVALUATION[/bold yellow]", border_style="yellow"))
 
@@ -334,32 +394,13 @@ def main():
     console.print(audit_table)
     console.print()
 
-    # -------------------------------------------------------------------------
-    # 5. GENERATE EQUITY CURVE CHART & EMIT SHA-256 AUDIT TRAIL
-    # -------------------------------------------------------------------------
-    output_dir = Path("artifacts")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    chart_path = output_dir / "triple_confluence_matrix_equity.png"
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    for r in matrix_results:
-        ax.plot([0, 1], [initial_cash, r["final_equity"]], label=f"{r['ticker']} (Sharpe: {r['sharpe']:.2f})")
-    ax.set_ylabel("Equity ($)")
-    ax.set_title("Triple Confluence Strategy — Multi-Ticker Matrix Performance")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    plt.tight_layout()
-    fig.savefig(chart_path, dpi=150)
-    plt.close(fig)
-
-    console.print(f"[bold green][PASS] Saved Performance Chart to:[/bold green] [bold cyan]{chart_path.resolve()}[/bold cyan]")
-
     # Run Causal Audit Logger Verification
     logger = AuditLogger(verbose=False)
-    report = logger.generate_report(backtest_result=raw_res, output_dir=output_dir)
-    display_audit_status(report)
+    if primary_res is not None:
+        report = logger.generate_report(backtest_result=primary_res[1]["raw_result"], output_dir=output_dir)
+        display_audit_status(report)
 
-    console.print("[bold green]Triple Confluence Master Suite Executed Successfully![/bold green]")
+    console.print("[bold green]TradingView Strategy Tester Suite Executed Successfully![/bold green]")
     return 0
 
 

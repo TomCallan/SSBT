@@ -125,6 +125,62 @@ def compute_metrics(
     }
 
 
+def compute_tradingview_overview(
+    equity_curve: np.ndarray,
+    trades: list[Trade],
+    initial_cash: float = 5000.0,
+    periods_per_year: int = 252,
+) -> dict:
+    """Compute complete TradingView Strategy Tester Overview metrics."""
+    base_metrics = compute_metrics(equity_curve, trades, periods_per_year)
+
+    gross_profit = sum(t.pnl for t in trades if t.pnl > 0)
+    gross_loss = abs(sum(t.pnl for t in trades if t.pnl < 0))
+    net_profit = base_metrics["final_equity"] - initial_cash
+    net_profit_pct = (net_profit / initial_cash) * 100.0
+
+    avg_win = float(np.mean([t.pnl for t in trades if t.pnl > 0])) if any(t.pnl > 0 for t in trades) else 0.0
+    avg_loss = float(np.mean([abs(t.pnl) for t in trades if t.pnl < 0])) if any(t.pnl < 0 for t in trades) else 0.0
+    payoff_ratio = (avg_win / avg_loss) if avg_loss > 0 else 0.0
+
+    # Max consecutive wins and losses
+    max_wins = 0
+    max_losses = 0
+    cur_wins = 0
+    cur_losses = 0
+
+    for t in trades:
+        if t.pnl > 0:
+            cur_wins += 1
+            cur_losses = 0
+            max_wins = max(max_wins, cur_wins)
+        elif t.pnl < 0:
+            cur_losses += 1
+            cur_wins = 0
+            max_losses = max(max_losses, cur_losses)
+
+    return {
+        "net_profit": net_profit,
+        "net_profit_pct": net_profit_pct,
+        "gross_profit": gross_profit,
+        "gross_loss": gross_loss,
+        "profit_factor": base_metrics["profit_factor"],
+        "max_drawdown": base_metrics["max_drawdown"],
+        "total_trades": base_metrics["n_trades"],
+        "win_rate": base_metrics["win_rate"] * 100.0,
+        "avg_trade": base_metrics["avg_trade"],
+        "avg_win": avg_win,
+        "avg_loss": avg_loss,
+        "payoff_ratio": payoff_ratio,
+        "sharpe": base_metrics["sharpe"],
+        "sortino": base_metrics["sortino"],
+        "calmar": base_metrics["calmar"],
+        "max_consecutive_wins": max_wins,
+        "max_consecutive_losses": max_losses,
+        "final_equity": base_metrics["final_equity"],
+    }
+
+
 def format_metrics(metrics: dict) -> str:
     """Pretty-print metrics dict as a string table."""
     lines = [
