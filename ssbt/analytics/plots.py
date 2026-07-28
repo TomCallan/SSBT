@@ -209,5 +209,84 @@ def plot_strategy_dashboard(
     return fig
 
 
+def plot(data: any, title: str | None = None, save_path: str | None = None):
+    """Universal 1-line visual plotting engine for SSBT.
+    
+    Accepts:
+    - BacktestResult / BacktestAdapter result dict: Renders 4-panel strategy dashboard.
+    - Polars / Pandas DataFrame: Renders price or quote series chart.
+    - NumPy Array / List: Renders line or equity curve plot.
+    """
+    plt = _import_mpl()
+
+    # 1. Option A: Backtest Result Dictionary / Raw BacktestResult
+    if isinstance(data, dict) and "raw_result" in data:
+        raw_res = data["raw_result"]
+        prices = data["feed_df"]["close"].to_numpy() if "feed_df" in data and "close" in data["feed_df"].columns else np.array([e[1] for e in raw_res.equity_curve])
+        return plot_strategy_dashboard(
+            prices=prices,
+            equity_curve=raw_res.equity_curve,
+            trades=raw_res.trades,
+            title=title or "Strategy Backtest Performance Dashboard",
+            save_path=save_path,
+        )
+
+    # 2. Option B: Polars / Pandas DataFrame
+    elif hasattr(data, "columns"):
+        cols = set(data.columns)
+        fig, ax = plt.subplots(figsize=(12, 5))
+        
+        if "close" in cols:
+            y_vals = data["close"].to_numpy() if hasattr(data["close"], "to_numpy") else np.array(data["close"])
+            ax.plot(y_vals, label="Close Price ($)", color="#1E88E5", linewidth=1.5)
+        elif "bid" in cols and "ask" in cols:
+            b_vals = data["bid"].to_numpy() if hasattr(data["bid"], "to_numpy") else np.array(data["bid"])
+            a_vals = data["ask"].to_numpy() if hasattr(data["ask"], "to_numpy") else np.array(data["ask"])
+            ax.plot(b_vals, label="Bid", color="#2E7D32")
+            ax.plot(a_vals, label="Ask", color="#C62828")
+        else:
+            first_col = list(data.columns)[0]
+            y_vals = data[first_col].to_numpy() if hasattr(data[first_col], "to_numpy") else np.array(data[first_col])
+            ax.plot(y_vals, label=str(first_col), color="#1E88E5")
+
+        ax.set_title(title or "Market Data Chart", fontsize=12, fontweight="bold")
+        ax.legend(loc="upper left")
+        ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=150)
+            plt.close()
+            return None
+        plt.show()
+        return fig
+
+    # 3. Option C: NumPy Array or List
+    elif isinstance(data, (np.ndarray, list)):
+        arr = np.asarray(data)
+        if arr.ndim == 2 and arr.shape[1] == 2:
+            return plot_equity_curve(arr, title=title or "Equity Curve", save_path=save_path)
+        else:
+            fig, ax = plt.subplots(figsize=(12, 4))
+            ax.plot(arr, color="#1E88E5", linewidth=1.5)
+            ax.set_title(title or "Data Series Chart")
+            ax.grid(True, alpha=0.3)
+            plt.tight_layout()
+            if save_path:
+                plt.savefig(save_path, dpi=150)
+                plt.close()
+                return None
+            plt.show()
+            return fig
+
+
+def autoplot(func):
+    """Decorator that automatically plots the result returned by a function."""
+    def wrapper(*args, **kwargs):
+        res = func(*args, **kwargs)
+        plot(res)
+        return res
+    return wrapper
+
+
 # Backward compatibility alias
 plot_tradingview_dashboard = plot_strategy_dashboard

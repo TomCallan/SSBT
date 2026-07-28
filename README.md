@@ -174,35 +174,24 @@ SSBT includes advanced market microstructure execution models and synthetic orde
 - `BorrowCostModel`: Calculates short position annualized borrow fee financing.
 - `RealisticExecutionEngine`: Combined execution wrapper.
 
-### 1. Universal Tick Stream Engine & Dynamic Forward-Filling (`UniversalTickStream`)
+### 1. Universal 1-Line Visual Plotting & Autoplot (`ssbt.plot` & `@ssbt.autoplot`)
 
-SSBT unifies any arbitrary set of user data sources—whether Raw Trade Ticks (L1), L2/L3 Orderbook depth quotes, or OHLCV bars of any resolution (1d, 4h, 1h, 15m, 1m)—into a single, high-performance `UniversalTickStream`. When high-frequency tick/orderbook data is absent or transitions to lower-frequency bars (e.g. 1-hour bars), prices and bid/ask quotes are automatically forward-filled so every tick event maintains coherent market state:
+Plot any backtest result, Polars/Pandas DataFrame, or numpy series instantly with a single function call:
 
 ```python
-import polars as pl
-from ssbt.data.universal_tick import UniversalTickStream, UniversalTickFeed
-from ssbt import MatchingEngine
+import ssbt
 
-# Combine Raw Ticks, L2 Depth Quotes, and 1-Hour OHLCV Bars
-stream_ticks = UniversalTickStream.build_stream(
-    data_sources=[data_ticks, data_l2_quotes, data_1h_bars],
-    symbol="GC=F",
-    spread_pct=0.0002,
-    forward_fill=True,  # Forward-fills bid/ask/mid prices across intervals
-)
+# Option A: 1-line backtest result plotting (Renders 4-panel strategy dashboard)
+result = adapter.run_backtest(feed, strategy)
+ssbt.plot(result, title="My Strategy Performance", save_path="artifacts/latest/dashboard.png")
 
-# Stream tick events to matching engine
-feed = UniversalTickFeed(stream_ticks)
-matching = MatchingEngine()
+# Option B: 1-line DataFrame or array plotting
+ssbt.plot(df, title="Market Data Chart")
 
-while feed.has_next():
-    tick = feed.next_tick()
-    fills = matching.process_tick(tick)
-```
-
-Run universal tick stream example:
-```bash
-uv run python examples/universal_tick_stream_example.py
+# Option C: @autoplot decorator on any data/strategy function
+@ssbt.autoplot
+def run_my_strategy():
+    return adapter.run_backtest(feed, strategy)
 ```
 
 ### 2. Multi-Resolution Cascading Orderbook Fallback (`apply_multi_resolution_sources`)
