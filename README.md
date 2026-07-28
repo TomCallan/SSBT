@@ -4,14 +4,16 @@
 [![Performance](https://img.shields.io/badge/engine-Polars%20%7C%20Numba%20%7C%20Zero--Allocation-green.svg)]()
 [![Audit Status](https://img.shields.io/badge/audit-Anti--Lookahead%20Verified-brightgreen.svg)]()
 
-SSBT is an ultra-fast, event-driven quantitative backtesting and research engine engineered for traders, quantitative researchers, and automated strategy developers. Built on top of Polars, NumPy, and Numba, SSBT eliminates Python loop overhead while maintaining 100% causal execution integrity and strict anti-lookahead auditing.
+SSBT is an ultra-fast, event-driven quantitative backtesting and research engine engineered for traders, quantitative researchers, and automated strategy developers. Built on top of Polars, NumPy, and Numba, SSBT eliminates Python loop overhead while maintaining 100% causal execution integrity, anti-lookahead auditing, and institutional overfitting defense.
 
 ---
 
 ## Key Quant Engine Capabilities
 
 - Zero-Allocation Bar Execution Loop: Pre-allocated memory structures eliminate per-bar object creation, delivering execution speeds over 1,000,000 bars/sec.
-- Anti-Lookahead Causal Audit System (AuditLogger): Built-in lineage tracing verifies that every order, fill, and metric calculation strictly respects temporal causality. Outputs SHA-256 integrity signatures for strategy validation.
+- Statistical Overfitting Defense (DSR & PBO): Built-in Deflated Sharpe Ratio (DSR), Probability of Backtest Overfitting (PBO), and Monte Carlo trade sequence resampling protect against data snooping.
+- Market Microstructure Realism: Square-root market impact modeling, ADV participation liquidity caps, regime-aware slippage, and short borrow fee financing.
+- Anti-Lookahead Causal Audit System (AuditLogger): Lineage tracing verifies that every order, fill, and metric calculation strictly respects temporal causality. Auto-emits formal simulation_assumptions_report.json with SHA-256 integrity signatures.
 - Prop Challenge Compliance Engine: Evaluates systematic strategies against institutional prop firm rules (e.g. Velotrade $5k account rules: Max Daily Loss -$250, Max Total Loss -$500, +8% Target Equity).
 - Multi-Ticker & Multi-Timeframe Matrix Framework: Evaluates performance matrices across asset classes (Gold, Silver, Crude Oil, Crypto, Tech Stocks) and timeframes (1d, 1h, 15m).
 - Real-Time Execution Stream (ExecutionStreamPublisher): Publishes JSON-lines events (BAR, ORDER, FILL, TRADE, EQUITY) over IPC / sockets for live GUI dashboards (Tkinter & Web browsers).
@@ -54,7 +56,7 @@ SSBT is an ultra-fast, event-driven quantitative backtesting and research engine
   |   ssbt.analytics     |               |  ExecutionStream     |
   |    .AuditLogger      |               |     Publisher        |
   | (Anti-Lookahead Causal|               |(Real-Time JSONL IPC  |
-  |      Audit Trail)    |               |    for GUIs / Web)   |
+  |  Audit & DSR / PBO)  |               |    for GUIs / Web)   |
   +----------------------+               +----------------------+
 ```
 
@@ -121,38 +123,37 @@ class TripleConfluenceStrategy(Strategy):
 
 ---
 
-### 2. Running a Multi-Ticker & Multi-Timeframe Strategy Matrix
+### 2. Statistical Overfitting Defense (DSR & Monte Carlo)
 
-Execute backtests across tickers (GC=F, SI=F, CL=F, BTC-USD) and timeframes (1d, 1h), automatically generating matrix heatmaps:
+Calculate Deflated Sharpe Ratio (DSR) and run Monte Carlo trade sequence resampling:
 
 ```python
-import polars as pl
-import yfinance as yf
-from ssbt import BacktestAdapter, InMemoryFeed, generate_matrix_heatmap_chart, generate_multi_equity_curve_chart
+from ssbt import deflated_sharpe_ratio, monte_carlo_trade_permutation
 
-# 1. Fetch Market Data & Convert to Polars InMemoryFeed
-df_pd = yf.download("GC=F", period="1y", interval="1d")
-pl_df = pl.DataFrame({
-    "timestamp": df_pd.index.astype("int64").values,
-    "symbol": ["GC=F"] * len(df_pd),
-    "open": df_pd["Open"].values.astype(float),
-    "high": df_pd["High"].values.astype(float),
-    "low": df_pd["Low"].values.astype(float),
-    "close": df_pd["Close"].values.astype(float),
-    "volume": df_pd["Volume"].values.astype(float),
-})
+# Deflated Sharpe Ratio adjusting for 10 trial parameter sweeps
+dsr = deflated_sharpe_ratio(observed_sharpe=2.22, var_sharpes=0.25, n_trials=10, returns_len=252)
+print(f"Deflated Sharpe Confidence: {dsr*100:.1f}%")
 
-feed = InMemoryFeed(pl_df, symbol="GC=F")
-adapter = BacktestAdapter(initial_cash=5000.0)
-
-# 2. Run Engine & Extract Standardized Metrics
-res = adapter.run_backtest(feed, TripleConfluenceStrategy())
-print(f"Final Equity: ${res['final_equity']:,.2f} | Sharpe: {res['metrics']['sharpe']:.2f}")
+# Monte Carlo 1,000 trade resampling
+mc_res = monte_carlo_trade_permutation(trade_pnls=[50.0, -20.0, 100.0], initial_cash=5000.0, n_iterations=1000)
+print(f"95% Lower Equity Bound: ${mc_res['ci_95_lower']:,.2f}")
 ```
 
 ---
 
-### 3. Launching Real-Time GUIs (Desktop & Web)
+### 3. Running Institutional Due-Diligence & Microstructure Analysis
+
+Run the institutional verification suite demonstrating market impact modeling, ADV capacity limits, and auto-emitted simulation reports:
+
+```bash
+uv run python examples/institutional_due_diligence_suite.py
+```
+
+See the full institutional due-diligence report in docs/INSTITUTIONAL_DUE_DILIGENCE.md.
+
+---
+
+### 4. Launching Real-Time GUIs (Desktop & Web)
 
 SSBT includes interactive GUIs in gui_examples/:
 
@@ -169,23 +170,9 @@ Open http://localhost:8080 in any web browser to launch strategies live and view
 
 ---
 
-### 4. Running the Causal Anti-Lookahead Audit
-
-Verify execution integrity and generate SHA-256 audit reports:
-
-```python
-from ssbt import AuditLogger
-
-logger = AuditLogger(verbose=True)
-report = logger.generate_report(backtest_result=res['raw_result'], output_dir="artifacts/run_01")
-print(f"Audit Passed: {report.passed} | SHA-256: {report.sha256_hash}")
-```
-
----
-
 ## Testing & Verification
 
-Run the full pytest suite (133 unit and integration tests):
+Run the full pytest suite (142 unit and integration tests):
 
 ```bash
 uv run python -m pytest ssbt/tests/ -v
@@ -207,17 +194,22 @@ SSBT/
 │   ├── core/                     # Engine, Portfolio, Matching, Events
 │   ├── data/                     # InMemory & Parquet Data Feeds
 │   ├── strategy/                 # Strategy Base Class & Position Helpers
-│   ├── analytics/                # AuditLogger, Metrics, Stream Publisher, Terminal
+│   ├── analytics/                # AuditLogger, Metrics, Stream Publisher, Robustness, Terminal
+│   ├── execution/                # ImpactModel, LiquidityCap, BorrowCost Engine
+│   ├── portfolio/                # VolatilityTargeting, Strategy Capacity Analyzer
 │   └── experiments/              # Exploration Engine, Spec Parser & Charting
 ├── gui_examples/                 # Real-time Interactive GUIs
 │   ├── desktop_gui.py            # Tkinter Desktop Quantitative Studio
 │   └── web_gui.py                # Web Browser Dashboard & HTTP API Server
 ├── strategies_vault/             # Proprietary Strategy Vault (Gitignored)
 │   └── triple_confluence.py      # Production Triple Confluence Strategy
-├── examples/                     # Ready-to-Run Research & Matrix Suites
+├── examples/                     # Ready-to-Run Research & Due-Diligence Suites
+│   ├── institutional_due_diligence_suite.py
 │   ├── multi_ticker_timeframe_suite.py
 │   ├── velotrade_5k_challenge.py
 │   └── triple_confluence_detail.py
+├── docs/                         # Quantitative Documentation & Architecture
+│   └── INSTITUTIONAL_DUE_DILIGENCE.md
 ├── artifacts/                    # Run Artifacts, Charts & Audit Trails (Gitignored)
 ├── pyproject.toml                # Package configuration (Python 3.12+)
 └── README.md                     # Engine Documentation & Guides

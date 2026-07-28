@@ -1,6 +1,6 @@
 # SSBT Quantitative Exploration Engine & Backtester Technical Reference
 
-High-speed event-driven research platform for market hypothesis testing, event studies, real-time IPC execution streaming, and realistic algorithmic trading strategy backtesting.
+High-speed event-driven research platform for market hypothesis testing, event studies, statistical overfitting defense (DSR/PBO), market microstructure impact modeling, real-time IPC execution streaming, and realistic algorithmic trading strategy backtesting.
 
 ## Overview & Architecture
 
@@ -20,20 +20,35 @@ SSBT consists of two tightly coupled engines:
 - Order Submission: `self.market_order()`, `self.limit_order()`, `self.stop_order()`, `self.stop_limit_order()`, `Order(..., type=OrderType.TRAILING_STOP, trail_offset=...)`.
 - Execution Engine: `Engine(feed, strategy, initial_cash)`. Runs single-pass Numba-accelerated event loop.
 
-### 2. `ssbt.analytics.stream` (Real-Time IPC Stream Publisher)
+### 2. `ssbt.analytics.robustness` (Overfitting Defense Suite)
+- `deflated_sharpe_ratio(observed_sharpe, var_sharpes, n_trials, returns_len, skew, kurtosis)`
+- `probability_of_backtest_overfitting(returns_matrix)`
+- `monte_carlo_trade_permutation(trade_pnls, initial_cash, n_iterations)`
+
+### 3. `ssbt.execution.models` (Market Microstructure Engine)
+- `ImpactModel`: Square-root market impact ($\text{Price} \cdot \gamma \cdot \sigma \cdot \sqrt{\text{Qty}/\text{ADV}}$).
+- `LiquidityCapModel`: Restricts max execution per bar to $\le 10\%$ ADV.
+- `BorrowCostModel`: Models short position annualized borrow fee financing.
+- `RealisticExecutionEngine`: Combined execution handler.
+
+### 4. `ssbt.portfolio.risk` (Risk Budgeting & Capacity Overlay)
+- `VolatilityTargetingOverlay`: Scales positions to target constant portfolio volatility (e.g. 12% target vol).
+- `StrategyCapacityAnalyzer`: Estimates maximum strategy AUM capacity before impact degrades Sharpe below 1.0.
+
+### 5. `ssbt.analytics.stream` (Real-Time IPC Stream Publisher)
 - Class: `ExecutionStreamPublisher(log_path="artifacts/<run_id>/execution_stream.jsonl")`
 - Methods: `publish(event_type, timestamp, data)`, `subscribe(callback_fn)`
 - Events: `BAR`, `ORDER`, `FILL`, `TRADE`, `EQUITY` streamed to JSONL files or live subscriber callbacks for PySide/Tkinter/Web interfaces.
 
-### 3. `ssbt.analytics.audit` & `ssbt.analytics.terminal`
-- Audit Logger: `AuditLogger()` verifies causal timestamp ordering, anti-lookahead integrity (`verify_event_outcomes`, `verify_backtest`), and exports `audit_trail.json` with SHA-256 signatures.
+### 6. `ssbt.analytics.audit` & `ssbt.analytics.terminal`
+- Audit Logger: `AuditLogger()` verifies causal timestamp ordering, anti-lookahead integrity (`verify_event_outcomes`, `verify_backtest`), and exports `audit_trail.json` and `simulation_assumptions_report.json`.
 - Terminal Renderer: `display_experiment_summary()`, `display_backtest_summary()`, `display_audit_status()` render clean Rich tables directly in terminal without Textual GUI requirements.
 
-### 4. `ssbt.experiments.charts`
+### 7. `ssbt.experiments.charts`
 - `generate_matrix_heatmap_chart(matrix_df, x_col, y_col, val_col, output_dir, name)`
 - `generate_multi_equity_curve_chart(equity_curves_dict, output_dir, name)`
 
-### 5. `ssbt.backtest.adapter`
+### 8. `ssbt.backtest.adapter`
 - Class: `BacktestAdapter(initial_cash=100_000.0)`
 - Method: `run_backtest(feed, strategy) -> dict`
 - Standardizes metrics (Sharpe, Sortino, Calmar, Max Drawdown, Win Rate, Profit Factor) and trade DataFrames.
@@ -42,7 +57,7 @@ SSBT consists of two tightly coupled engines:
 
 ```python
 import polars as pl
-from ssbt import Strategy, Side, Order, OrderType, OrderStatus, BacktestAdapter, InMemoryFeed, AuditLogger
+from ssbt import Strategy, Side, Order, OrderType, OrderStatus, BacktestAdapter, InMemoryFeed, AuditLogger, deflated_sharpe_ratio
 
 class SampleStrategy(Strategy):
     def on_bar(self, bar, engine):
@@ -52,7 +67,9 @@ class SampleStrategy(Strategy):
 feed = InMemoryFeed(df, symbol="GC=F")
 adapter = BacktestAdapter(initial_cash=5000.0)
 result = adapter.run_backtest(feed, SampleStrategy())
+
+dsr = deflated_sharpe_ratio(observed_sharpe=result['metrics']['sharpe'], var_sharpes=0.25, n_trials=10, returns_len=len(result['equity_curve']))
 logger = AuditLogger(verbose=False)
 report = logger.generate_report(backtest_result=result["raw_result"])
-print(f"Final Equity: ${result['final_equity']:,.2f} | Audit Passed: {report.passed}")
+print(f"Final Equity: ${result['final_equity']:,.2f} | DSR Confidence: {dsr*100:.1f}% | Audit Passed: {report.passed}")
 ```
