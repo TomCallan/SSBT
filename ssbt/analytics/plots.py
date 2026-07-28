@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 import numpy as np
 
 from ssbt.core.events import Trade
@@ -213,11 +215,18 @@ def plot(data: any, title: str | None = None, save_path: str | None = None):
     """Universal 1-line visual plotting engine for SSBT.
     
     Accepts:
-    - BacktestResult / BacktestAdapter result dict: Renders 4-panel strategy dashboard.
-    - Polars / Pandas DataFrame: Renders price or quote series chart.
-    - NumPy Array / List: Renders line or equity curve plot.
+    1. BacktestResult / BacktestAdapter result dict: Renders 4-panel strategy dashboard.
+    2. Polars / Pandas DataFrame: Renders price, quote, or feature series chart.
+    3. NumPy Array / List: Renders line or equity curve plot.
     """
     plt = _import_mpl()
+
+    # Default save path to artifacts/latest/
+    if save_path is None:
+        latest_dir = Path("artifacts") / "latest"
+        latest_dir.mkdir(parents=True, exist_ok=True)
+        fname = (title or "plot").lower().replace(" ", "_").replace("(", "").replace(")", "").replace("-", "_") + ".png"
+        save_path = str(latest_dir / fname)
 
     # 1. Option A: Backtest Result Dictionary / Raw BacktestResult
     if isinstance(data, dict) and "raw_result" in data:

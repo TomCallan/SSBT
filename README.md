@@ -176,14 +176,14 @@ SSBT includes advanced market microstructure execution models and synthetic orde
 
 ### 1. Universal 1-Line Visual Plotting & Autoplot (`ssbt.plot` & `@ssbt.autoplot`)
 
-Plot any backtest result, Polars/Pandas DataFrame, or numpy series instantly with a single function call:
+Plot any backtest result, Polars/Pandas DataFrame, or numpy series instantly with a single function call. By default, plots are automatically saved to `artifacts/latest/<title>.png` or inside the active run folder:
 
 ```python
 import ssbt
 
 # Option A: 1-line backtest result plotting (Renders 4-panel strategy dashboard)
 result = adapter.run_backtest(feed, strategy)
-ssbt.plot(result, title="My Strategy Performance", save_path="artifacts/latest/dashboard.png")
+ssbt.plot(result, title="Strategy Performance Dashboard")
 
 # Option B: 1-line DataFrame or array plotting
 ssbt.plot(df, title="Market Data Chart")
@@ -193,6 +193,13 @@ ssbt.plot(df, title="Market Data Chart")
 def run_my_strategy():
     return adapter.run_backtest(feed, strategy)
 ```
+
+#### Supported Autoplotter Input Data Types
+| Data Structure | Automatically Generated Plot Type | Output Details |
+| :--- | :--- | :--- |
+| **Backtest Adapter Dict / `BacktestResult`** | **4-Panel Strategy Dashboard** | 1. Price Chart + Indicator Overlay + Buy/Sell Trade Entry/Exit Markers<br>2. Account Equity Curve vs Buy & Hold Benchmark<br>3. Underwater Drawdown Area Fill Chart (%)<br>4. Per-Trade PnL Distribution Bars ($) |
+| **Polars / Pandas DataFrame** | **Price / Quote / Feature Series Chart** | - OHLCV tables (`close` column): Renders price line chart<br>- Quote tables (`bid`, `ask` columns): Renders bid/ask spread lines<br>- Arbitrary feature tables: Renders multi-line feature series |
+| **NumPy Array / Python List** | **Equity Curve / Line Chart** | - 2D Array `[timestamp, equity]`: Renders filled equity curve<br>- 1D Array / List: Renders numeric line series chart |
 
 ### 2. Multi-Resolution Cascading Orderbook Fallback (`apply_multi_resolution_sources`)
 
