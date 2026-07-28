@@ -56,6 +56,8 @@ def capture_environment_snapshot(
 
     if output_dir is not None:
         out_path = Path(output_dir)
+        if str(out_path).strip().rstrip("/\\") in ("artifacts", ".\\artifacts", "./artifacts"):
+            out_path = Path("artifacts") / "latest"
         out_path.mkdir(parents=True, exist_ok=True)
         with open(out_path / "environment_snapshot.json", "w") as f:
             json.dump(snapshot, f, indent=2)

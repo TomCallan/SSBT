@@ -266,11 +266,12 @@ def _write_artifacts(
         json.dump(manifest, f, indent=2)
 
 
-def run_experiment(config_path: str | Path) -> dict[str, Any]:
+def run_experiment(config_path: str | Path, output_dir: str | Path | None = None) -> dict[str, Any]:
     """Run a full experiment from a YAML/JSON config file.
 
     Args:
         config_path: Path to the config file (.yaml, .yml, or .json).
+        output_dir: Optional explicit directory to write artifacts to.
 
     Returns:
         Dict with keys: events (DataFrame), outcomes (DataFrame), stats (dict), output_dir (Path)
@@ -302,18 +303,35 @@ def run_experiment(config_path: str | Path) -> dict[str, Any]:
     stats["diagnostics"] = diagnostics
 
     # Generate charts if configured
-    output_dir = Path(spec.reporting.output_dir if spec.reporting else "artifacts")
+    if output_dir is not None:
+        target_dir = Path(output_dir)
+    else:
+        raw_dir = spec.reporting.output_dir if spec.reporting and spec.reporting.output_dir else "artifacts/latest"
+        if str(raw_dir).strip().rstrip("/\\") in ("artifacts", ".\\artifacts", "./artifacts"):
+            run_id = f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+            target_dir = Path("artifacts") / run_id
+        else:
+            target_dir = Path(raw_dir)
+
     if spec.reporting and spec.reporting.charts:
-        chart_results = generate_all_charts(events, outcomes, stats, spec, output_dir)
+        chart_results = generate_all_charts(events, outcomes, stats, spec, target_dir)
         stats["charts"] = chart_results
 
-    _write_artifacts(events, outcomes, stats, spec, output_dir)
+    _write_artifacts(events, outcomes, stats, spec, target_dir)
+
+    # Sync run folder to artifacts/latest if writing to a run folder
+    if target_dir.parent == Path("artifacts") and target_dir.name != "latest":
+        import shutil
+        latest_dir = Path("artifacts") / "latest"
+        if latest_dir.exists():
+            shutil.rmtree(latest_dir)
+        shutil.copytree(target_dir, latest_dir)
 
     return {
         "events": events,
         "outcomes": outcomes,
         "statistics": stats,
-        "output_dir": output_dir,
+        "output_dir": target_dir,
     }
 
 

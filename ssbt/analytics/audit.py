@@ -158,6 +158,8 @@ class AuditLogger:
 
         if output_dir is not None:
             out_path = Path(output_dir)
+            if str(out_path).strip().rstrip("/\\") in ("artifacts", ".\\artifacts", "./artifacts"):
+                out_path = Path("artifacts") / "latest"
             out_path.mkdir(parents=True, exist_ok=True)
             
             audit_dict = {

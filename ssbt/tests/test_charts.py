@@ -46,7 +46,7 @@ def test_runner_chart_and_manifest_checksums(tmp_path):
     if not config_path.exists():
         pytest.skip("volume_spike.yaml not found")
 
-    result = run_experiment(config_path)
+    result = run_experiment(config_path, output_dir=tmp_path)
     out_dir = result["output_dir"]
     manifest_path = out_dir / "manifest.json"
 

@@ -7,18 +7,18 @@ import ssbt
 from ssbt.analytics.plots import plot, autoplot
 
 
-def test_plot_dataframe():
+def test_plot_dataframe(tmp_path):
     df = pl.DataFrame({
         "timestamp": [1000, 2000],
         "close": [100.0, 105.0],
     })
-    res = plot(df, title="Test DataFrame Plot", save_path="artifacts/latest/test_df_plot.png")
+    res = plot(df, title="Test DataFrame Plot", save_path=str(tmp_path / "test_df_plot.png"))
     assert res is None  # Saved to file
 
 
-def test_plot_array():
+def test_plot_array(tmp_path):
     arr = np.array([100.0, 102.0, 101.0, 105.0])
-    res = plot(arr, title="Test Array Plot", save_path="artifacts/latest/test_arr_plot.png")
+    res = plot(arr, title="Test Array Plot", save_path=str(tmp_path / "test_arr_plot.png"))
     assert res is None
 
 
