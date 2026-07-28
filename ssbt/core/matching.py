@@ -104,7 +104,18 @@ class MatchingEngine:
         new_fills: list[Fill] = []
         indices_to_remove: list[int] = []
 
-        for i, order in enumerate(self._pending):
+        # Sort pending orders to enforce worst-case execution ordering ("fills against position then for")
+        # Adverse stop-loss and trailing stops (priority 0) are matched BEFORE profit-taking limits (priority 1)
+        def _order_priority(ord_item: Order) -> int:
+            if ord_item.type in (OrderType.STOP, OrderType.STOP_MARKET, OrderType.TRAILING_STOP):
+                return 0
+            if ord_item.type in (OrderType.LIMIT, OrderType.STOP_LIMIT):
+                return 1
+            return 2
+
+        sorted_pending = sorted(enumerate(self._pending), key=lambda x: _order_priority(x[1]))
+
+        for i, order in sorted_pending:
             if order.symbol != bar.symbol:
                 continue
 

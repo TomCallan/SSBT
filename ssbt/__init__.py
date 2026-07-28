@@ -30,6 +30,7 @@ from ssbt.experiments.registry import Registry, RegistryError
 from ssbt.backtest.adapter import BacktestAdapter
 from ssbt.experiments.reproducibility import capture_environment_snapshot
 from ssbt.data.point_in_time import align_multi_timeframe, validate_point_in_time_join, CausalityViolationError
+from ssbt.data.orderbook import rebuild_orderbook_from_bars, OrderBookFeed, OrderBookQuote
 from ssbt.analytics.audit import AuditLogger, AuditReport
 from ssbt.analytics.stream import ExecutionStreamPublisher, StreamEvent
 from ssbt.analytics.robustness import (
