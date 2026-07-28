@@ -109,16 +109,16 @@ def plot_trades(
     return fig
 
 
-def plot_tradingview_dashboard(
+def plot_strategy_dashboard(
     prices: np.ndarray,
     equity_curve: np.ndarray,
     trades: list[Trade],
     dates: list | np.ndarray | None = None,
-    title: str = "TradingView Strategy Tester Dashboard",
+    title: str = "Institutional Strategy Performance Dashboard",
     initial_cash: float = 5000.0,
     save_path: str | None = None,
 ):
-    """Plot complete 4-panel TradingView Strategy Tester Dashboard.
+    """Plot complete 4-panel Institutional Strategy Performance Dashboard.
     
     Panel 1: Price Chart + Indicator Overlays + Trade Entry/Exit Markers
     Panel 2: Account Equity Curve vs Buy-and-Hold Benchmark
@@ -207,3 +207,7 @@ def plot_tradingview_dashboard(
         return None
     plt.show()
     return fig
+
+
+# Backward compatibility alias
+plot_tradingview_dashboard = plot_strategy_dashboard

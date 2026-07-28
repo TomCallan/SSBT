@@ -1,17 +1,19 @@
-"""Triple Confluence Strategy Master Verification, TradingView Dashboard & Multi-Timeframe Matrix Suite.
+"""Triple Confluence Strategy Master Verification, Strategy Dashboard & Multi-Timeframe Matrix Suite.
 
 This script executes the complete production quantitative workflow:
 1. Downloads multi-resolution market data (5m, 15m, 1h, 1d) across a ticker matrix via yfinance.
 2. Merges multi-resolution DataFrames into forward-filled UniversalTickStream objects.
 3. Evaluates TripleConfluenceStrategy across a decision timeframe matrix (5m, 1h, 4h, 1d).
 4. Evaluates worst-case adverse execution matching ("fills against position then for").
-5. Computes TradingView Strategy Tester Overview metrics (Net Profit, Profit Factor, Win Rate, Payoff Ratio, Max Consecutive Wins/Losses).
+5. Computes Strategy Overview metrics (Net Profit, Profit Factor, Win Rate, Payoff Ratio, Max Consecutive Wins/Losses).
 6. Computes statistical overfitting defenses: Deflated Sharpe Ratio (DSR), Probability of Backtest Overfitting (PBO), and Monte Carlo 1,000 trade resampling.
-7. Renders multi-panel TradingView dashboard charts (Price + Trade Markers, Equity vs Benchmark, Underwater Drawdown Area Fill, Per-Trade PnL Bars) saved to artifacts/tradingview_strategy_tester.png.
+7. Renders 4-panel visual plot dashboards (Price + Trade Markers, Equity vs Benchmark, Underwater Drawdown Area Fill, Per-Trade PnL Bars) saved to artifacts/run_<id>/strategy_dashboard.png and artifacts/latest/.
 8. Emits SHA-256 signed audit trails and simulation assumptions reports.
 """
 
 import sys
+import shutil
+from datetime import datetime
 from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
@@ -30,7 +32,7 @@ from ssbt.core.matching import MatchingEngine
 from ssbt.backtest.adapter import BacktestAdapter
 from ssbt.analytics.audit import AuditLogger
 from ssbt.analytics.metrics import compute_tradingview_overview
-from ssbt.analytics.plots import plot_tradingview_dashboard
+from ssbt.analytics.plots import plot_strategy_dashboard
 from ssbt.analytics.robustness import (
     deflated_sharpe_ratio, probability_of_backtest_overfitting, monte_carlo_trade_permutation
 )
@@ -46,12 +48,7 @@ def fetch_multi_resolution_ticker_data(
     symbol: str = "GC=F",
     period: str = "60d",
 ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
-    """Fetch multi-resolution market data (5m intraday, 1h hourly, 1d daily) for a ticker.
-    
-    SSBT Data Ingestion Principle:
-    SSBT contains zero internal vendor fetchers. External vendor data is loaded
-    and converted to Polars DataFrames with standard schema: timestamp, symbol, open, high, low, close, volume.
-    """
+    """Fetch multi-resolution market data (5m intraday, 1h hourly, 1d daily) for a ticker."""
     print(f"Downloading {symbol} multi-resolution market data via yfinance...")
 
     # Fetch 5-minute intraday bars (High-Resolution Execution Data)
@@ -61,7 +58,7 @@ def fetch_multi_resolution_ticker_data(
             df_5m_pd.columns = df_5m_pd.columns.get_level_values(0)
         df_5m_pd = df_5m_pd.reset_index().dropna(subset=["Close", "Volume"])
         time_col_5m = df_5m_pd.columns[0]
-        ts_5m = pd.to_datetime(df_5m_pd[time_col_5m]).astype(np.int64) // 10**6  # ms epoch
+        ts_5m = pd.to_datetime(df_5m_pd[time_col_5m]).astype(np.int64) // 10**6
         pl_5m = pl.DataFrame({
             "timestamp": ts_5m.values,
             "symbol": [symbol] * len(df_5m_pd),
@@ -118,13 +115,7 @@ def fetch_multi_resolution_ticker_data(
 # 2. TRIPLE CONFLUENCE STRATEGY DEFINITION
 # -----------------------------------------------------------------------------
 class TripleConfluenceStrategy(Strategy):
-    """Triple Confluence Quantitative Strategy.
-    
-    Confluence Signal Triggers:
-    1. Trend Confluence: Close > EMA(20)
-    2. Momentum Confluence: 45.0 <= RSI(14) <= 65.0 (Bullish trend continuation, avoiding overbought)
-    3. Volatility-Based Position Sizing: Risk-budgeted position sizing using ATR(10) trailing stops.
-    """
+    """Triple Confluence Quantitative Strategy."""
     def __init__(self, ema_period: int = 20, rsi_period: int = 14, risk_dollars: float = 85.0):
         super().__init__()
         self.ema_period = ema_period
@@ -135,40 +126,33 @@ class TripleConfluenceStrategy(Strategy):
         self.lows: list[float] = []
 
     def on_bar(self, bar: Bar, engine) -> None:
-        """Executed on every decision bar."""
         self.closes.append(bar.close)
         self.highs.append(bar.high)
         self.lows.append(bar.low)
 
-        # Ensure warm-up bar history
         if len(self.closes) < self.ema_period + 2:
             return
 
-        # 1. EMA Calculation
         ema = float(np.mean(self.closes[-self.ema_period:]))
         
-        # 2. RSI Calculation
         diffs = np.diff(self.closes[-self.rsi_period - 1:])
         gains = np.where(diffs > 0, diffs, 0.0)
         losses = np.where(diffs < 0, -diffs, 0.0)
         rs = float(np.mean(gains)) / (float(np.mean(losses)) + 1e-8)
         rsi = 100.0 - (100.0 / (1.0 + rs))
 
-        # 3. ATR Volatility Metric
         tr = np.maximum(
             np.array(self.highs[-10:]) - np.array(self.lows[-10:]),
             np.abs(np.array(self.highs[-10:]) - np.array(self.closes[-11:-1]))
         )
         atr = float(np.mean(tr)) if len(tr) > 0 else bar.close * 0.01
 
-        # 4. Entry Evaluation (Only enter if currently FLAT to prevent over-leverage)
         if bar.close > ema and 45.0 <= rsi <= 65.0 and self.is_flat(engine, bar.symbol):
             stop_dist = max(1.8 * atr, bar.close * 0.008)
             qty = round(self.risk_dollars / stop_dist, 2)
             if qty <= 0:
                 qty = 1.0
 
-            # Submit Market Buy Order + Adverse Trailing Stop Exit Order
             engine.submit_order(self.market_order(bar.symbol, Side.BUY, qty))
             engine.submit_order(Order(
                 id=0, symbol=bar.symbol, side=Side.SELL, type=OrderType.TRAILING_STOP,
@@ -180,15 +164,19 @@ class TripleConfluenceStrategy(Strategy):
 # 3. MASTER EXECUTION & MATRIX RUNNER
 # -----------------------------------------------------------------------------
 def main():
+    run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    run_dir = Path("artifacts") / run_id
+    latest_dir = Path("artifacts") / "latest"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
     console.print()
     console.print(Panel.fit(
-        "[bold cyan]TRIPLE CONFLUENCE STRATEGY — TRADINGVIEW DASHBOARD & MATRIX SUITE[/bold cyan]\n"
-        "[dim]Multi-Ticker x Multi-Timeframe Sweep | TradingView Strategy Tester Overview | 4-Panel Plot Dashboard[/dim]",
+        f"[bold cyan]TRIPLE CONFLUENCE STRATEGY MASTER SUITE[/bold cyan]\n"
+        f"[dim]Run ID: {run_id} | Output Directory: {run_dir}[/dim]",
         border_style="cyan"
     ))
 
-    # Ticker Matrix & Timeframe Configuration
-    tickers = ["GC=F", "SI=F", "CL=F"]  # Gold, Silver, Crude Oil Futures
+    tickers = ["GC=F", "SI=F", "CL=F"]
     initial_cash = 5000.0
 
     matrix_results = []
@@ -197,7 +185,6 @@ def main():
 
     primary_res = None
 
-    # Iterate through Ticker Matrix
     for symbol in tickers:
         try:
             pl_5m, pl_1h, pl_1d = fetch_multi_resolution_ticker_data(symbol, period="60d")
@@ -208,7 +195,6 @@ def main():
         if pl_1d.is_empty():
             continue
 
-        # Build Universal Dynamic Tick Stream (Merging 5m, 1h, 1d Data with Forward-Filling)
         stream_ticks = UniversalTickStream.build_stream(
             data_sources=[pl_5m, pl_1h, pl_1d],
             symbol=symbol,
@@ -218,7 +204,6 @@ def main():
 
         console.print(f"Built Universal Tick Stream for [bold white]{symbol}[/bold white]: {len(stream_ticks)} Ticks")
 
-        # Run Backtest across Decision Timeframe (Daily Base Data)
         feed = InMemoryFeed(pl_1d, symbol=symbol)
         strategy = TripleConfluenceStrategy()
         adapter = BacktestAdapter(initial_cash=initial_cash)
@@ -245,7 +230,6 @@ def main():
             win_rate = (wins / n_trades) * 100.0
             all_trade_pnls.extend(pnls)
 
-        # Store return series for PBO matrix
         if len(raw_res.equity_curve) > 1:
             eq_vals = np.array([e[1] for e in raw_res.equity_curve])
             rets = np.diff(eq_vals) / (eq_vals[:-1] + 1e-8)
@@ -264,9 +248,8 @@ def main():
             "win_rate": win_rate,
         })
 
-    # Render Strategy Matrix Results Table
     console.print()
-    matrix_table = Table(title="Triple Confluence Strategy Matrix Test Results", header_style="bold yellow", border_style="dim")
+    matrix_table = Table(title="Strategy Performance Matrix", header_style="bold yellow", border_style="dim")
     matrix_table.add_column("Ticker", style="cyan")
     matrix_table.add_column("Decision TF", style="white")
     matrix_table.add_column("Universal Ticks", justify="right", style="dim")
@@ -296,9 +279,7 @@ def main():
     console.print(matrix_table)
     console.print()
 
-    # -------------------------------------------------------------------------
-    # 4. TRADINGVIEW STRATEGY TESTER OVERVIEW METRICS
-    # -------------------------------------------------------------------------
+    # Render Strategy Overview & 4-Panel Plot Dashboard
     if primary_res is not None:
         pl_1d_primary, primary_backtest = primary_res
         tv_metrics = compute_tradingview_overview(
@@ -307,52 +288,45 @@ def main():
             initial_cash=initial_cash,
         )
 
-        tv_table = Table(title="TradingView Strategy Tester Overview (Gold GC=F)", header_style="bold green", border_style="dim")
-        tv_table.add_column("TradingView Metric", style="cyan")
-        tv_table.add_column("Value ($ / %)", justify="right", style="bold white")
+        overview_table = Table(title="Strategy Performance Overview (Gold GC=F)", header_style="bold green", border_style="dim")
+        overview_table.add_column("Metric", style="cyan")
+        overview_table.add_column("Value", justify="right", style="bold white")
 
         pnl_col = "green" if tv_metrics["net_profit"] >= 0 else "red"
-        tv_table.add_row("Net Profit", f"[{pnl_col}]${tv_metrics['net_profit']:,.2f} ({tv_metrics['net_profit_pct']:.2f}%)[/{pnl_col}]")
-        tv_table.add_row("Gross Profit", f"${tv_metrics['gross_profit']:,.2f}")
-        tv_table.add_row("Gross Loss", f"-${tv_metrics['gross_loss']:,.2f}")
-        tv_table.add_row("Profit Factor", f"{tv_metrics['profit_factor']:.2f}")
-        tv_table.add_row("Max Drawdown", f"-{abs(tv_metrics['max_drawdown']*100):.2f}%")
-        tv_table.add_row("Total Closed Trades", str(tv_metrics["total_trades"]))
-        tv_table.add_row("Percent Profitable (Win Rate)", f"{tv_metrics['win_rate']:.1f}%")
-        tv_table.add_row("Average Trade PnL", f"${tv_metrics['avg_trade']:,.2f}")
-        tv_table.add_row("Average Win / Average Loss", f"${tv_metrics['avg_win']:,.2f} / ${tv_metrics['avg_loss']:,.2f}")
-        tv_table.add_row("Payoff Ratio (Avg Win / Avg Loss)", f"{tv_metrics['payoff_ratio']:.2f}")
-        tv_table.add_row("Sharpe Ratio", f"{tv_metrics['sharpe']:.2f}")
-        tv_table.add_row("Sortino Ratio", f"{tv_metrics['sortino']:.2f}")
-        tv_table.add_row("Calmar Ratio", f"{tv_metrics['calmar']:.2f}")
-        tv_table.add_row("Max Consecutive Wins / Losses", f"{tv_metrics['max_consecutive_wins']} / {tv_metrics['max_consecutive_losses']}")
+        overview_table.add_row("Net Profit", f"[{pnl_col}]${tv_metrics['net_profit']:,.2f} ({tv_metrics['net_profit_pct']:.2f}%)[/{pnl_col}]")
+        overview_table.add_row("Gross Profit", f"${tv_metrics['gross_profit']:,.2f}")
+        overview_table.add_row("Gross Loss", f"-${tv_metrics['gross_loss']:,.2f}")
+        overview_table.add_row("Profit Factor", f"{tv_metrics['profit_factor']:.2f}")
+        overview_table.add_row("Max Drawdown", f"-{abs(tv_metrics['max_drawdown']*100):.2f}%")
+        overview_table.add_row("Total Closed Trades", str(tv_metrics["total_trades"]))
+        overview_table.add_row("Percent Profitable (Win Rate)", f"{tv_metrics['win_rate']:.1f}%")
+        overview_table.add_row("Average Trade PnL", f"${tv_metrics['avg_trade']:,.2f}")
+        overview_table.add_row("Average Win / Average Loss", f"${tv_metrics['avg_win']:,.2f} / ${tv_metrics['avg_loss']:,.2f}")
+        overview_table.add_row("Payoff Ratio", f"{tv_metrics['payoff_ratio']:.2f}")
+        overview_table.add_row("Sharpe Ratio", f"{tv_metrics['sharpe']:.2f}")
+        overview_table.add_row("Sortino Ratio", f"{tv_metrics['sortino']:.2f}")
+        overview_table.add_row("Calmar Ratio", f"{tv_metrics['calmar']:.2f}")
+        overview_table.add_row("Max Consecutive Wins / Losses", f"{tv_metrics['max_consecutive_wins']} / {tv_metrics['max_consecutive_losses']}")
 
-        console.print(tv_table)
+        console.print(overview_table)
         console.print()
 
-        # Render 4-Panel TradingView Dashboard Plot
-        output_dir = Path("artifacts")
-        output_dir.mkdir(parents=True, exist_ok=True)
-        tv_chart_path = output_dir / "tradingview_strategy_tester.png"
-
-        plot_tradingview_dashboard(
+        chart_path = run_dir / "strategy_dashboard.png"
+        plot_strategy_dashboard(
             prices=pl_1d_primary["close"].to_numpy(),
             equity_curve=primary_backtest["raw_result"].equity_curve,
             trades=primary_backtest["raw_result"].trades,
-            title="TradingView Strategy Tester — Gold (GC=F) Multi-Panel Dashboard",
+            title="Institutional Strategy Performance Dashboard (Gold GC=F)",
             initial_cash=initial_cash,
-            save_path=str(tv_chart_path),
+            save_path=str(chart_path),
         )
 
-        console.print(f"[bold green][PASS] Saved TradingView 4-Panel Plot Dashboard to:[/bold green] [bold cyan]{tv_chart_path.resolve()}[/bold cyan]")
+        console.print(f"[bold green][PASS] Saved Strategy Dashboard Plot to:[/bold green] [bold cyan]{chart_path.resolve()}[/bold cyan]")
         console.print()
 
-    # -------------------------------------------------------------------------
-    # 5. INSTITUTIONAL OVERFITTING DEFENSE SUITE (DSR, PBO, MONTE CARLO)
-    # -------------------------------------------------------------------------
+    # Overfitting Defense & Robustness
     console.print(Panel.fit("[bold yellow]INSTITUTIONAL OVERFITTING DEFENSE & AUDIT EVALUATION[/bold yellow]", border_style="yellow"))
 
-    # A. Deflated Sharpe Ratio (DSR)
     top_sharpe = max([r["sharpe"] for r in matrix_results], default=1.5)
     dsr_val = deflated_sharpe_ratio(
         observed_sharpe=top_sharpe,
@@ -361,14 +335,12 @@ def main():
         returns_len=252,
     )
 
-    # B. Probability of Backtest Overfitting (PBO)
     pbo_val = 0.0
     if len(returns_matrix_list) > 1:
         min_len = min(len(r) for r in returns_matrix_list)
         mat = np.column_stack([r[:min_len] for r in returns_matrix_list])
         pbo_val = probability_of_backtest_overfitting(mat)
 
-    # C. Monte Carlo 1,000 Trade Resampling
     if not all_trade_pnls:
         all_trade_pnls = [50.0, -20.0, 120.0, -15.0, 80.0]
 
@@ -378,7 +350,6 @@ def main():
         n_iterations=1000,
     )
 
-    # Render Institutional Due-Diligence Table
     audit_table = Table(title="Statistical Robustness & Overfitting Defense Audit", header_style="bold green", border_style="dim")
     audit_table.add_column("Quantitative Criterion", style="cyan")
     audit_table.add_column("Empirical Result", justify="right", style="white")
@@ -397,10 +368,16 @@ def main():
     # Run Causal Audit Logger Verification
     logger = AuditLogger(verbose=False)
     if primary_res is not None:
-        report = logger.generate_report(backtest_result=primary_res[1]["raw_result"], output_dir=output_dir)
+        report = logger.generate_report(backtest_result=primary_res[1]["raw_result"], output_dir=run_dir)
         display_audit_status(report)
 
-    console.print("[bold green]TradingView Strategy Tester Suite Executed Successfully![/bold green]")
+    # Sync run folder to artifacts/latest/
+    if latest_dir.exists():
+        shutil.rmtree(latest_dir)
+    shutil.copytree(run_dir, latest_dir)
+    console.print(f"[bold green][PASS] Synced Run Assets to Artifacts Latest Folder:[/bold green] [bold cyan]{latest_dir.resolve()}[/bold cyan]")
+    console.print()
+
     return 0
 
 
