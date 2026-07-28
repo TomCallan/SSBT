@@ -14,9 +14,11 @@ High-speed event-driven research platform for market hypothesis testing, event s
 - Order Submission: `self.market_order()`, `self.limit_order()`, `self.stop_order()`, `self.stop_limit_order()`, `Order(..., type=OrderType.TRAILING_STOP, trail_offset=...)`.
 - Execution Engine: `Engine(feed, strategy, initial_cash)`. Runs single-pass Numba-accelerated event loop with worst-case adverse order sorting ("fills against position then for").
 
-### 2. `ssbt.data.orderbook` (Orderbook Engine & Synthetic Reconstruction)
-- `rebuild_orderbook_from_bars(bar_df, spread_pct, depth_levels)`: Reconstructs synthetic L2 multi-level bid/ask depth quotes from minute/hourly bar DataFrames.
-- `OrderBookFeed`: Event feed streaming `OrderBookQuote` depth events.
+### 2. `ssbt.data.universal_tick` & `ssbt.data.orderbook`
+- `UniversalTickStream.build_stream(data_sources, symbol, spread_pct, forward_fill)`: Dynamic multi-source merging of raw ticks, L2/L3 orderbooks, and OHLCV bars into forward-filled `GenericTickEvent` streams.
+- `OrderBookEngine.apply_multi_resolution_sources(base_df, resolution_sources)`: Cascading multi-resolution execution feed fallback (1m -> 5m -> 15m -> 1h bar fallback).
+- `rebuild_orderbook_from_bars(bar_df, spread_pct, depth_levels)`: Reconstructs L2 multi-level bid/ask depth quotes.
+- `OrderBookFeed` & `UniversalTickFeed`: Event feeds streaming quotes and ticks.
 
 ### 3. `ssbt.analytics.robustness` (Overfitting Defense Suite)
 - `deflated_sharpe_ratio(observed_sharpe, var_sharpes, n_trials, returns_len, skew, kurtosis)`

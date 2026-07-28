@@ -30,7 +30,8 @@ M7 [X] 100% Hardening, Orderbook Engine, Partial Fills, Rerun Engine & Real-Time
 ## Key Package APIs
 - Core Strategy Base: `from ssbt import Strategy, Side, Order, OrderType, OrderStatus, Bar`
 - Position Helpers: `self.is_flat(engine, symbol)`, `self.get_position_qty(engine, symbol)`
-- Orderbook & Partial Fills: `from ssbt import rebuild_orderbook_from_bars, OrderBookFeed, OrderBookQuote`
+- Universal Tick Stream: `from ssbt import UniversalTickStream, UniversalTickFeed, GenericTickEvent`
+- Orderbook & Fallback Engine: `from ssbt import OrderBookEngine, rebuild_orderbook_from_bars, OrderBookFeed, OrderBookQuote`
 - Reproducibility & Rerun: `from ssbt import capture_environment_snapshot`, `python -m ssbt.cli.rerun <artifact_dir>`
 - Point-In-Time Alignment: `from ssbt import align_multi_timeframe, validate_point_in_time_join`
 - Overfitting Defense: `from ssbt import deflated_sharpe_ratio, probability_of_backtest_overfitting, monte_carlo_trade_permutation`
