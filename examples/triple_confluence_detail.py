@@ -372,9 +372,7 @@ def main():
         display_audit_status(report)
 
     # Sync run folder to artifacts/latest/
-    if latest_dir.exists():
-        shutil.rmtree(latest_dir)
-    shutil.copytree(run_dir, latest_dir)
+    sync_latest_run_folder(run_dir)
     console.print(f"[bold green][PASS] Synced Run Assets to Artifacts Latest Folder:[/bold green] [bold cyan]{latest_dir.resolve()}[/bold cyan]")
     console.print()
 

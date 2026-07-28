@@ -201,3 +201,19 @@ class AuditLogger:
         with open(output_dir / "simulation_assumptions_report.json", "w") as f:
             json.dump(report_data, f, indent=2)
         return report_data
+
+
+def sync_latest_run_folder(run_dir: Path | str) -> Path:
+    """Dynamically populate artifacts/latest with an exact copy of the run folder contents."""
+    import shutil
+    source_dir = Path(run_dir)
+    latest_dir = Path("artifacts") / "latest"
+
+    if source_dir.resolve() == latest_dir.resolve():
+        return latest_dir
+
+    if latest_dir.exists():
+        shutil.rmtree(latest_dir)
+
+    shutil.copytree(source_dir, latest_dir)
+    return latest_dir

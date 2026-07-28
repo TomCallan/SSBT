@@ -321,11 +321,8 @@ def run_experiment(config_path: str | Path, output_dir: str | Path | None = None
 
     # Sync run folder to artifacts/latest if writing to a run folder
     if target_dir.parent == Path("artifacts") and target_dir.name != "latest":
-        import shutil
-        latest_dir = Path("artifacts") / "latest"
-        if latest_dir.exists():
-            shutil.rmtree(latest_dir)
-        shutil.copytree(target_dir, latest_dir)
+        from ssbt.analytics.audit import sync_latest_run_folder
+        sync_latest_run_folder(target_dir)
 
     return {
         "events": events,

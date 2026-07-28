@@ -58,3 +58,14 @@ def test_audit_generate_report(tmp_path):
 
     assert report.is_valid
     assert (tmp_path / "audit_trail.json").exists()
+
+
+def test_sync_latest_run_folder(tmp_path):
+    from ssbt.analytics.audit import sync_latest_run_folder
+    run_dir = tmp_path / "run_test_01"
+    run_dir.mkdir()
+    (run_dir / "sample.txt").write_text("hello world")
+
+    latest = sync_latest_run_folder(run_dir)
+    assert latest.exists()
+    assert (latest / "sample.txt").read_text() == "hello world"
