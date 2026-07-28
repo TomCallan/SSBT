@@ -392,6 +392,11 @@ class MatchingEngine:
 
         return new_fills
 
+    def process_tick(self, tick: GenericTickEvent) -> list[Fill]:
+        """Match pending orders against a GenericTickEvent (unifying raw ticks, L2/L3 orderbooks, and forward-filled bars)."""
+        ba = BidAsk(timestamp=tick.timestamp, symbol=tick.symbol, bid=tick.bid, ask=tick.ask)
+        return self.process_bidask(ba)
+
     def cancel(self, order_id: int) -> bool:
         """Cancel a pending order by ID."""
         for i, order in enumerate(self._pending):

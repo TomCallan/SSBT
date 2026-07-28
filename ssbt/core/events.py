@@ -56,6 +56,20 @@ class BidAsk:
 
 
 @dataclass(slots=True)
+class GenericTickEvent:
+    """Universal Tick Event unifying Raw Ticks, L2/L3 Orderbooks, and Forward-Filled OHLCV Bars."""
+    timestamp: int
+    symbol: str
+    price: float
+    bid: float
+    ask: float
+    bid_qty: float = 100.0
+    ask_qty: float = 100.0
+    volume: float = 0.0
+    data_source_type: str = "TICK"  # TICK, L2_ORDERBOOK, L3_ORDERBOOK, BAR
+
+
+@dataclass(slots=True)
 class Order:
     id: int
     symbol: str

@@ -174,29 +174,29 @@ SSBT includes advanced market microstructure execution models and synthetic orde
 - `BorrowCostModel`: Calculates short position annualized borrow fee financing.
 - `RealisticExecutionEngine`: Combined execution wrapper.
 
-### 1. Multi-Resolution Cascading Orderbook Fallback (1h -> 1m -> 5m -> 15m -> Fallback)
+### 1. Universal Tick Stream & Dynamic Multi-Source Data Merging (`UniversalTickStream`)
 
-Trade low-resolution decision bars (e.g. 1-hour bars) using dynamic multi-resolution execution feeds (`apply_multi_resolution_sources`). When a higher-resolution feed (e.g. 1-minute data) runs out or has gaps, SSBT automatically falls back to the next best available resolution (5-minute, 15-minute, or 1-hour bar fallback):
+Unify any combination of user data sources (Raw Trade Ticks, L2/L3 Orderbooks, and OHLCV Bars of any resolution) into a single, high-performance tick stream with automatic forward-filling:
 
 ```python
 import polars as pl
-from ssbt import OrderBookEngine
+from ssbt.data.universal_tick import UniversalTickStream, UniversalTickFeed
 
-# User loads base 1-hour decision bars (data_1h) and high-res feeds (data_1m, data_5m, data_15m)
-quotes = OrderBookEngine.apply_multi_resolution_sources(
-    base_df=data_1h,
-    resolution_sources=[data_1m, data_5m, data_15m],  # Priority hierarchy
+# Combine Raw Ticks, L2 Orderbook Quotes, and 1-Hour OHLCV Bars
+stream_ticks = UniversalTickStream.build_stream(
+    data_sources=[data_ticks, data_l2_orderbook, data_1h_bars],
+    symbol="GC=F",
     spread_pct=0.0002,
-    depth_levels=5,
+    forward_fill=True,  # Forward-fills bid/ask/mid prices across intervals
 )
 
-# Convert generated L2 quotes into Polars DataFrame
-orderbook_df = OrderBookEngine.to_dataframe(quotes)
+# Stream to matching engine
+feed = UniversalTickFeed(stream_ticks)
 ```
 
-Run the multi-resolution cascading example:
+Run the universal tick stream example:
 ```bash
-uv run python examples/multi_resolution_orderbook_fallback_example.py
+uv run python examples/universal_tick_stream_example.py
 ```
 
 ### Arbitrary-Resolution Synthetic L2 Orderbook Reconstruction (`ssbt.data.orderbook`)
