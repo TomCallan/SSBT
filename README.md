@@ -174,32 +174,63 @@ SSBT includes advanced market microstructure execution models and synthetic orde
 - `BorrowCostModel`: Calculates short position annualized borrow fee financing.
 - `RealisticExecutionEngine`: Combined execution wrapper.
 
-### 1. Universal Tick Stream & Dynamic Multi-Source Data Merging (`UniversalTickStream`)
+### 1. Universal Tick Stream Engine & Dynamic Forward-Filling (`UniversalTickStream`)
 
-Unify any combination of user data sources (Raw Trade Ticks, L2/L3 Orderbooks, and OHLCV Bars of any resolution) into a single, high-performance tick stream with automatic forward-filling:
+SSBT unifies any arbitrary set of user data sources—whether Raw Trade Ticks (L1), L2/L3 Orderbook depth quotes, or OHLCV bars of any resolution (1d, 4h, 1h, 15m, 1m)—into a single, high-performance `UniversalTickStream`. When high-frequency tick/orderbook data is absent or transitions to lower-frequency bars (e.g. 1-hour bars), prices and bid/ask quotes are automatically forward-filled so every tick event maintains coherent market state:
 
 ```python
 import polars as pl
 from ssbt.data.universal_tick import UniversalTickStream, UniversalTickFeed
+from ssbt import MatchingEngine
 
-# Combine Raw Ticks, L2 Orderbook Quotes, and 1-Hour OHLCV Bars
+# Combine Raw Ticks, L2 Depth Quotes, and 1-Hour OHLCV Bars
 stream_ticks = UniversalTickStream.build_stream(
-    data_sources=[data_ticks, data_l2_orderbook, data_1h_bars],
+    data_sources=[data_ticks, data_l2_quotes, data_1h_bars],
     symbol="GC=F",
     spread_pct=0.0002,
     forward_fill=True,  # Forward-fills bid/ask/mid prices across intervals
 )
 
-# Stream to matching engine
+# Stream tick events to matching engine
 feed = UniversalTickFeed(stream_ticks)
+matching = MatchingEngine()
+
+while feed.has_next():
+    tick = feed.next_tick()
+    fills = matching.process_tick(tick)
 ```
 
-Run the universal tick stream example:
+Run universal tick stream example:
 ```bash
 uv run python examples/universal_tick_stream_example.py
 ```
 
-### Arbitrary-Resolution Synthetic L2 Orderbook Reconstruction (`ssbt.data.orderbook`)
+### 2. Multi-Resolution Cascading Orderbook Fallback (`apply_multi_resolution_sources`)
+
+Trade low-resolution decision bars (e.g. 1-hour bars) using dynamic multi-resolution execution feeds (`apply_multi_resolution_sources`). When a higher-resolution feed (e.g. 1-minute data) runs out or has gaps, SSBT automatically falls back to the next best available resolution (5-minute, 15-minute, or 1-hour bar fallback):
+
+```python
+import polars as pl
+from ssbt import OrderBookEngine
+
+# User loads base 1-hour decision bars (data_1h) and high-res feeds (data_1m, data_5m, data_15m)
+quotes = OrderBookEngine.apply_multi_resolution_sources(
+    base_df=data_1h,
+    resolution_sources=[data_1m, data_5m, data_15m],  # Priority hierarchy
+    spread_pct=0.0002,
+    depth_levels=5,
+)
+
+# Convert generated L2 quotes into Polars DataFrame
+orderbook_df = OrderBookEngine.to_dataframe(quotes)
+```
+
+Run multi-resolution fallback example:
+```bash
+uv run python examples/multi_resolution_orderbook_fallback_example.py
+```
+
+### 3. Arbitrary-Resolution Synthetic L2 Orderbook Reconstruction (`reconstruct`)
 Takes data of **any base resolution $x$** (e.g. 1d, 4h, 1h, 15m) and synthesizes multi-level L2 bid/ask depth quotes at **target resolution $y$** (e.g. 1m sub-bar ticks) using `OrderBookEngine.reconstruct(df, sub_bar_splits=N)`.
 
 ```python
