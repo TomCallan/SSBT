@@ -1,4 +1,7 @@
-"""Example demonstrating synthetic L2 Orderbook reconstruction from minute bars and partial fills execution.
+"""Arbitrary Resolution Orderbook Reconstruction Example for SSBT.
+
+Demonstrates taking low-resolution base data (x = 1-hour bars) and reconstructing
+high-resolution synthetic L2 orderbook quotes (y = 1-minute sub-bar ticks) using OrderBookEngine.
 
 SSBT Data Ingestion Philosophy:
 SSBT harnesses ZERO internal data downloading interfaces. All market data (CSV, Parquet, CCXT, SQL)
@@ -8,12 +11,9 @@ is ingested externally and fed as Polars DataFrames into SSBT feeds.
 import sys
 import numpy as np
 import polars as pl
-from ssbt.data.orderbook import rebuild_orderbook_from_bars, OrderBookFeed
-from ssbt.strategy.base import Strategy
-from ssbt.core.engine import Engine
-from ssbt.data.feed import InMemoryFeed
-from ssbt.core.events import Side, Order, OrderStatus, OrderType, Bar
+from ssbt.data.orderbook import OrderBookEngine, OrderBookFeed
 from ssbt.execution.models import RealisticExecutionEngine
+from ssbt.core.events import Side
 from ssbt.analytics.terminal import console
 from rich.panel import Panel
 from rich.table import Table
@@ -22,40 +22,50 @@ from rich.table import Table
 def main():
     console.print()
     console.print(Panel.fit(
-        "[bold cyan]SSBT SYNTHETIC L2 ORDERBOOK RECONSTRUCTION & PARTIAL FILLS DEMONSTRATION[/bold cyan]\n"
-        "[dim]Architecture: 100% External Data Ingestion -> Polars Arrow -> L2 Depth Reconstruction[/dim]",
+        "[bold cyan]SSBT ARBITRARY RESOLUTION ORDERBOOK RECONSTRUCTION DEMONSTRATION[/bold cyan]\n"
+        "[dim]Base Resolution x (1-Hour Bars) -> Target Sub-Bar Resolution y (1-Minute L2 Orderbook Ticks)[/dim]",
         border_style="cyan"
     ))
 
-    # 1. Simulate 1-minute bar data (External Data Source)
-    n_bars = 50
-    timestamps = np.arange(n_bars, dtype=np.int64) * 60_000 + 1_700_000_000_000
-    prices = 2000.0 + np.cumsum(np.random.normal(0, 1.5, n_bars))
+    # 1. Base Data x: 10 Hourly Bars (User External Data)
+    n_hourly_bars = 10
+    timestamps_1h = np.arange(n_hourly_bars, dtype=np.int64) * 3600_000 + 1_700_000_000_000
+    prices_1h = 2000.0 + np.cumsum(np.random.normal(0, 5.0, n_hourly_bars))
 
-    bar_df = pl.DataFrame({
-        "timestamp": timestamps,
-        "symbol": ["GC=F"] * n_bars,
-        "open": prices,
-        "high": prices + 1.0,
-        "low": prices - 1.0,
-        "close": prices + 0.2,
-        "volume": np.full(n_bars, 500.0),
+    data_1h = pl.DataFrame({
+        "timestamp": timestamps_1h,
+        "symbol": ["GC=F"] * n_hourly_bars,
+        "open": prices_1h,
+        "high": prices_1h + 4.0,
+        "low": prices_1h - 4.0,
+        "close": prices_1h + 1.0,
+        "volume": np.full(n_hourly_bars, 10000.0),
     })
 
-    # 2. Rebuild Synthetic L2 Orderbook Quotes (5 Depth Levels)
-    quotes = rebuild_orderbook_from_bars(bar_df, spread_pct=0.0002, depth_levels=5)
-    console.print(f"[bold green][PASS] Reconstructed {len(quotes)} L2 Orderbook Quotes from 1-minute bar data.[/bold green]")
+    console.print(f"Loaded Base Data x: [bold white]{len(data_1h)} Hourly Bars[/bold white]")
 
-    # Display Top 3 Reconstructed Orderbook Quotes
-    table = Table(title="Reconstructed Synthetic L2 Orderbook Depth (First 3 Quotes)", header_style="bold yellow")
-    table.add_column("Timestamp", style="dim")
+    # 2. Reconstruct High-Resolution Orderbook y (1-Minute Ticks, sub_bar_splits=60)
+    quotes_1m = OrderBookEngine.reconstruct(
+        data_1h,
+        sub_bar_splits=60,  # 60 sub-bar minute ticks per 1-hour bar
+        spread_pct=0.0002,
+        depth_levels=5,
+    )
+
+    orderbook_df = OrderBookEngine.to_dataframe(quotes_1m)
+    console.print(f"[bold green][PASS] Reconstructed {len(quotes_1m)} 1-Minute L2 Orderbook Quotes (y) from {len(data_1h)} Hourly Bars (x)![/bold green]")
+    console.print()
+
+    # Display Reconstructed Sub-Bar Orderbook Ticks
+    table = Table(title="Synthesized 1-Minute Orderbook Quotes (First 5 Sub-Bar Ticks from Hour 1)", header_style="bold yellow")
+    table.add_column("Sub-Tick TS", style="dim")
     table.add_column("Symbol", style="cyan")
     table.add_column("Top Bid (Price @ Qty)", style="green")
     table.add_column("Top Ask (Price @ Qty)", style="red")
     table.add_column("Level 5 Bid", style="dim green")
     table.add_column("Level 5 Ask", style="dim red")
 
-    for q in quotes[:3]:
+    for q in quotes_1m[:5]:
         table.add_row(
             str(q.timestamp),
             q.symbol,
@@ -68,17 +78,18 @@ def main():
     console.print(table)
     console.print()
 
-    # 3. Demonstrate Partial Fill Execution Engine
+    # 3. Test Execution Against Orderbook Depth
     exec_engine = RealisticExecutionEngine(base_slippage_bps=1.0, commission_bps=1.0)
-    fill_res = exec_engine.process_execution(price=2000.0, qty=120.0, side=Side.BUY, bar_volume=500.0)
+    fill_res = exec_engine.process_execution(price=quotes_1m[0].ask, qty=150.0, side=Side.BUY, bar_volume=quotes_1m[0].ask_qty * 10)
 
-    console.print("[bold yellow]Partial Fill Execution Result (Requested Qty: 120.0, Bar Vol: 500.0, Cap: 10% ADV = 50.0):[/bold yellow]")
+    console.print("[bold yellow]Execution Against Sub-Bar Orderbook Depth Result:[/bold yellow]")
+    console.print(f"  - Requested Qty: 150.0")
     console.print(f"  - Executed Qty: {fill_res['executed_qty']:.1f}")
     console.print(f"  - Executed Price: ${fill_res['executed_price']:,.2f}")
     console.print(f"  - Is Partially Filled: [bold cyan]{fill_res['is_partially_filled']}[/bold cyan]")
     console.print()
 
-    console.print("[bold green]SSBT Orderbook Engine & Partial Fills Demonstration Completed Successfully![/bold green]")
+    console.print("[bold green]Arbitrary Resolution Orderbook Engine Completed Successfully![/bold green]")
     return 0
 
 
