@@ -1,7 +1,7 @@
 {
   "experiment_name": "volume_spike_study",
   "experiment_type": "event_study",
-  "generated_at": "2026-07-28T21:05:28.671740Z",
+  "generated_at": "2026-07-28T21:09:40.753777Z",
   "artifacts": [
     {
       "name": "events.csv",
@@ -35,7 +35,7 @@
     },
     {
       "name": "summary.json",
-      "checksum": "842abd4ff31b0cd4797b07797e2d2466e8b8971de86bf01eae892d2f5a88a227",
+      "checksum": "c802122b484ed83e2b4723e42c1da739ea12390fe5125b8e2377bc92ced9630f",
       "size": 9062
     },
     {

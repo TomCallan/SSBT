@@ -18,29 +18,26 @@ def test_rebuild_orderbook_from_bars():
         "volume": [1000.0, 1200.0],
     })
 
-    quotes = rebuild_orderbook_from_bars(df, sub_bar_splits=10, spread_pct=0.0002, depth_levels=5)
-    assert len(quotes) == 20
+    quotes = rebuild_orderbook_from_bars(df, spread_pct=0.0002, depth_levels=5)
+    assert len(quotes) == 2
     assert quotes[0].bid < quotes[0].ask
     assert len(quotes[0].bids) == 5
     assert len(quotes[0].asks) == 5
 
 
 def test_apply_multi_resolution_sources_fallback():
-    # Base 1-hour bars (timestamps 0, 3600000)
     base_df = pl.DataFrame({
         "timestamp": [0, 3600000],
         "symbol": ["GC=F"] * 2,
         "close": [2000.0, 2010.0],
     })
 
-    # High-resolution 1-minute data for Hour 1 ONLY (timestamps 0 to 60000)
     src_1m = pl.DataFrame({
         "timestamp": [0, 60000, 120000],
         "symbol": ["GC=F"] * 3,
         "close": [2000.0, 2001.0, 2002.0],
     })
 
-    # Apply fallback hierarchy: 1m feed for Hour 1, fallback to 1h bar for Hour 2
     quotes = OrderBookEngine.apply_multi_resolution_sources(base_df, resolution_sources=[src_1m])
     assert len(quotes) == 4  # 3 quotes from 1m data + 1 quote from 1h fallback
 
@@ -53,9 +50,9 @@ def test_orderbook_engine_to_dataframe():
         "volume": [1000.0],
     })
 
-    quotes = OrderBookEngine.reconstruct(df, sub_bar_splits=5)
+    quotes = OrderBookEngine.reconstruct(df)
     ob_df = OrderBookEngine.to_dataframe(quotes)
-    assert len(ob_df) == 5
+    assert len(ob_df) == 1
     assert "bid" in ob_df.columns
     assert "ask" in ob_df.columns
 
@@ -73,5 +70,4 @@ def test_worst_case_execution_ordering():
     fills = engine.process_bar(bar)
 
     assert len(fills) > 0
-    # Worst-case: Adverse Stop Loss (id=2) matched FIRST
     assert fills[0].order_id == 2

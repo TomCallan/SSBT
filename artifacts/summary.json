@@ -1,7 +1,7 @@
 {
   "experiment_name": "volume_spike_study",
   "experiment_type": "event_study",
-  "generated_at": "2026-07-28T21:05:28.612795Z",
+  "generated_at": "2026-07-28T21:09:40.685839Z",
   "n_events": 408,
   "n_outcomes": 1632,
   "statistics": {
