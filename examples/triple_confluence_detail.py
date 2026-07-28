@@ -7,11 +7,12 @@ This script executes the complete production quantitative workflow:
 4. Evaluates worst-case adverse execution matching ("fills against position then for").
 5. Computes Strategy Overview metrics (Net Profit, Profit Factor, Win Rate, Payoff Ratio, Max Consecutive Wins/Losses).
 6. Computes statistical overfitting defenses: Deflated Sharpe Ratio (DSR), Probability of Backtest Overfitting (PBO), and Monte Carlo 1,000 trade resampling.
-7. Renders 4-panel visual plot dashboards (Price + Trade Markers, Equity vs Benchmark, Underwater Drawdown Area Fill, Per-Trade PnL Bars) saved to artifacts/run_<id>/strategy_dashboard.png and artifacts/latest/.
-8. Emits SHA-256 signed audit trails and simulation assumptions reports.
+7. Renders 4-panel visual plot dashboards (Price + Trade Markers, Equity vs Benchmark, Underwater Drawdown Area Fill, Per-Trade PnL Bars).
+8. Emits all 10 standard institutional run artifacts to artifacts/run_<id>/ and mirrors them to artifacts/latest/.
 """
 
 import sys
+import json
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -30,9 +31,12 @@ from ssbt.data.feed import InMemoryFeed
 from ssbt.data.universal_tick import UniversalTickStream, UniversalTickFeed
 from ssbt.core.matching import MatchingEngine
 from ssbt.backtest.adapter import BacktestAdapter
-from ssbt.analytics.audit import AuditLogger
+from ssbt.analytics.audit import AuditLogger, sync_latest_run_folder
+from ssbt.experiments.reproducibility import capture_environment_snapshot
+from ssbt.analytics.stream import ExecutionStreamPublisher
 from ssbt.analytics.metrics import compute_tradingview_overview
 from ssbt.analytics.plots import plot_strategy_dashboard
+from ssbt.experiments.charts import generate_multi_equity_curve_chart
 from ssbt.analytics.robustness import (
     deflated_sharpe_ratio, probability_of_backtest_overfitting, monte_carlo_trade_permutation
 )
@@ -166,7 +170,6 @@ class TripleConfluenceStrategy(Strategy):
 def main():
     run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     run_dir = Path("artifacts") / run_id
-    latest_dir = Path("artifacts") / "latest"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     console.print()
@@ -179,11 +182,15 @@ def main():
     tickers = ["GC=F", "SI=F", "CL=F"]
     initial_cash = 5000.0
 
+    # Initialize Real-Time IPC Stream Publisher inside run directory
+    stream_publisher = ExecutionStreamPublisher(log_path=run_dir / "execution_stream.jsonl")
+
     matrix_results = []
     returns_matrix_list = []
     all_trade_pnls = []
 
     primary_res = None
+    multi_equity_curves = {}
 
     for symbol in tickers:
         try:
@@ -216,6 +223,14 @@ def main():
         metrics = result["metrics"]
         trades_df = result["trades"]
         final_eq = result["final_equity"]
+
+        # Track multi equity curves
+        if len(raw_res.equity_curve) > 0:
+            multi_equity_curves[symbol] = np.array(raw_res.equity_curve)
+
+        # Stream event logs
+        for t in raw_res.trades:
+            stream_publisher.publish("TRADE", t.exit_time, {"symbol": t.symbol, "entry_price": t.entry_price, "exit_price": t.exit_price, "qty": t.qty, "side": t.side.name if hasattr(t.side, "name") else str(t.side), "pnl": t.pnl})
 
         net_profit = final_eq - initial_cash
         net_profit_pct = (final_eq / initial_cash - 1.0) * 100.0
@@ -279,6 +294,9 @@ def main():
     console.print(matrix_table)
     console.print()
 
+    # Save matrix_results.csv to run folder
+    pl.DataFrame(matrix_results).write_csv(run_dir / "matrix_results.csv")
+
     # Render Strategy Overview & 4-Panel Plot Dashboard
     if primary_res is not None:
         pl_1d_primary, primary_backtest = primary_res
@@ -287,6 +305,16 @@ def main():
             trades=primary_backtest["raw_result"].trades,
             initial_cash=initial_cash,
         )
+
+        # Save metrics_overview.json
+        with open(run_dir / "metrics_overview.json", "w") as f:
+            json.dump(tv_metrics, f, indent=2)
+
+        # Save trade_log.csv & trade_log.parquet
+        trades_df = primary_backtest["trades"]
+        if trades_df is not None and not trades_df.is_empty():
+            trades_df.write_csv(run_dir / "trade_log.csv")
+            trades_df.write_parquet(run_dir / "trade_log.parquet")
 
         overview_table = Table(title="Strategy Performance Overview (Gold GC=F)", header_style="bold green", border_style="dim")
         overview_table.add_column("Metric", style="cyan")
@@ -324,6 +352,10 @@ def main():
         console.print(f"[bold green][PASS] Saved Strategy Dashboard Plot to:[/bold green] [bold cyan]{chart_path.resolve()}[/bold cyan]")
         console.print()
 
+    # Save multi_equity_curves chart to run folder
+    if multi_equity_curves:
+        generate_multi_equity_curve_chart(multi_equity_curves, run_dir, name="matrix_equity")
+
     # Overfitting Defense & Robustness
     console.print(Panel.fit("[bold yellow]INSTITUTIONAL OVERFITTING DEFENSE & AUDIT EVALUATION[/bold yellow]", border_style="yellow"))
 
@@ -350,6 +382,17 @@ def main():
         n_iterations=1000,
     )
 
+    overfitting_audit = {
+        "top_matrix_sharpe": top_sharpe,
+        "deflated_sharpe_ratio": dsr_val,
+        "probability_of_backtest_overfitting": pbo_val,
+        "monte_carlo_ci_95_lower": mc_res["ci_95_lower"],
+        "monte_carlo_ci_95_upper": mc_res["ci_95_upper"],
+        "monte_carlo_max_dd_95": mc_res["max_dd_95"],
+    }
+    with open(run_dir / "overfitting_defense_audit.json", "w") as f:
+        json.dump(overfitting_audit, f, indent=2)
+
     audit_table = Table(title="Statistical Robustness & Overfitting Defense Audit", header_style="bold green", border_style="dim")
     audit_table.add_column("Quantitative Criterion", style="cyan")
     audit_table.add_column("Empirical Result", justify="right", style="white")
@@ -365,15 +408,18 @@ def main():
     console.print(audit_table)
     console.print()
 
+    # Capture Reproducibility Environment Snapshot
+    capture_environment_snapshot(output_dir=run_dir)
+
     # Run Causal Audit Logger Verification
     logger = AuditLogger(verbose=False)
     if primary_res is not None:
         report = logger.generate_report(backtest_result=primary_res[1]["raw_result"], output_dir=run_dir)
         display_audit_status(report)
 
-    # Sync run folder to artifacts/latest/
-    sync_latest_run_folder(run_dir)
-    console.print(f"[bold green][PASS] Synced Run Assets to Artifacts Latest Folder:[/bold green] [bold cyan]{latest_dir.resolve()}[/bold cyan]")
+    # Dynamically populate artifacts/latest with an EXACT 1-to-1 copy of run_dir
+    latest_path = sync_latest_run_folder(run_dir)
+    console.print(f"[bold green][PASS] Synced Run Assets to Artifacts Latest Folder:[/bold green] [bold cyan]{latest_path.resolve()}[/bold cyan]")
     console.print()
 
     return 0
