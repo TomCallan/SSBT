@@ -66,6 +66,6 @@ def test_sync_latest_run_folder(tmp_path):
     run_dir.mkdir()
     (run_dir / "sample.txt").write_text("hello world")
 
-    latest = sync_latest_run_folder(run_dir)
+    latest = sync_latest_run_folder(run_dir, target_dir=tmp_path / "latest")
     assert latest.exists()
     assert (latest / "sample.txt").read_text() == "hello world"

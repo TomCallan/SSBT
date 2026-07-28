@@ -203,11 +203,11 @@ class AuditLogger:
         return report_data
 
 
-def sync_latest_run_folder(run_dir: Path | str) -> Path:
+def sync_latest_run_folder(run_dir: Path | str, target_dir: Path | str | None = None) -> Path:
     """Dynamically populate artifacts/latest with an exact copy of the run folder contents."""
     import shutil
     source_dir = Path(run_dir)
-    latest_dir = Path("artifacts") / "latest"
+    latest_dir = Path(target_dir) if target_dir is not None else Path("artifacts") / "latest"
 
     if source_dir.resolve() == latest_dir.resolve():
         return latest_dir

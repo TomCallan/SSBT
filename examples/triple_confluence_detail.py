@@ -297,65 +297,6 @@ def main():
     # Save matrix_results.csv to run folder
     pl.DataFrame(matrix_results).write_csv(run_dir / "matrix_results.csv")
 
-    # Render Strategy Overview & 4-Panel Plot Dashboard
-    if primary_res is not None:
-        pl_1d_primary, primary_backtest = primary_res
-        tv_metrics = compute_tradingview_overview(
-            equity_curve=primary_backtest["raw_result"].equity_curve,
-            trades=primary_backtest["raw_result"].trades,
-            initial_cash=initial_cash,
-        )
-
-        # Save metrics_overview.json
-        with open(run_dir / "metrics_overview.json", "w") as f:
-            json.dump(tv_metrics, f, indent=2)
-
-        # Save trade_log.csv & trade_log.parquet
-        trades_df = primary_backtest["trades"]
-        if trades_df is not None and not trades_df.is_empty():
-            trades_df.write_csv(run_dir / "trade_log.csv")
-            trades_df.write_parquet(run_dir / "trade_log.parquet")
-
-        overview_table = Table(title="Strategy Performance Overview (Gold GC=F)", header_style="bold green", border_style="dim")
-        overview_table.add_column("Metric", style="cyan")
-        overview_table.add_column("Value", justify="right", style="bold white")
-
-        pnl_col = "green" if tv_metrics["net_profit"] >= 0 else "red"
-        overview_table.add_row("Net Profit", f"[{pnl_col}]${tv_metrics['net_profit']:,.2f} ({tv_metrics['net_profit_pct']:.2f}%)[/{pnl_col}]")
-        overview_table.add_row("Gross Profit", f"${tv_metrics['gross_profit']:,.2f}")
-        overview_table.add_row("Gross Loss", f"-${tv_metrics['gross_loss']:,.2f}")
-        overview_table.add_row("Profit Factor", f"{tv_metrics['profit_factor']:.2f}")
-        overview_table.add_row("Max Drawdown", f"-{abs(tv_metrics['max_drawdown']*100):.2f}%")
-        overview_table.add_row("Total Closed Trades", str(tv_metrics["total_trades"]))
-        overview_table.add_row("Percent Profitable (Win Rate)", f"{tv_metrics['win_rate']:.1f}%")
-        overview_table.add_row("Average Trade PnL", f"${tv_metrics['avg_trade']:,.2f}")
-        overview_table.add_row("Average Win / Average Loss", f"${tv_metrics['avg_win']:,.2f} / ${tv_metrics['avg_loss']:,.2f}")
-        overview_table.add_row("Payoff Ratio", f"{tv_metrics['payoff_ratio']:.2f}")
-        overview_table.add_row("Sharpe Ratio", f"{tv_metrics['sharpe']:.2f}")
-        overview_table.add_row("Sortino Ratio", f"{tv_metrics['sortino']:.2f}")
-        overview_table.add_row("Calmar Ratio", f"{tv_metrics['calmar']:.2f}")
-        overview_table.add_row("Max Consecutive Wins / Losses", f"{tv_metrics['max_consecutive_wins']} / {tv_metrics['max_consecutive_losses']}")
-
-        console.print(overview_table)
-        console.print()
-
-        chart_path = run_dir / "strategy_dashboard.png"
-        plot_strategy_dashboard(
-            prices=pl_1d_primary["close"].to_numpy(),
-            equity_curve=primary_backtest["raw_result"].equity_curve,
-            trades=primary_backtest["raw_result"].trades,
-            title="Institutional Strategy Performance Dashboard (Gold GC=F)",
-            initial_cash=initial_cash,
-            save_path=str(chart_path),
-        )
-
-        console.print(f"[bold green][PASS] Saved Strategy Dashboard Plot to:[/bold green] [bold cyan]{chart_path.resolve()}[/bold cyan]")
-        console.print()
-
-    # Save multi_equity_curves chart to run folder
-    if multi_equity_curves:
-        generate_multi_equity_curve_chart(multi_equity_curves, run_dir, name="matrix_equity")
-
     # Overfitting Defense & Robustness
     console.print(Panel.fit("[bold yellow]INSTITUTIONAL OVERFITTING DEFENSE & AUDIT EVALUATION[/bold yellow]", border_style="yellow"))
 
@@ -407,6 +348,77 @@ def main():
 
     console.print(audit_table)
     console.print()
+
+    # Render Strategy Overview & Multi-Asset Plot Dashboard
+    if primary_res is not None:
+        pl_1d_primary, primary_backtest = primary_res
+        tv_metrics = compute_tradingview_overview(
+            equity_curve=primary_backtest["raw_result"].equity_curve,
+            trades=primary_backtest["raw_result"].trades,
+            initial_cash=initial_cash,
+        )
+
+        # Save metrics_overview.json
+        with open(run_dir / "metrics_overview.json", "w") as f:
+            json.dump(tv_metrics, f, indent=2)
+
+        # Save trade_log.csv & trade_log.parquet
+        trades_df = primary_backtest["trades"]
+        if trades_df is not None and not trades_df.is_empty():
+            trades_df.write_csv(run_dir / "trade_log.csv")
+            trades_df.write_parquet(run_dir / "trade_log.parquet")
+
+        overview_table = Table(title="Strategy Performance Overview (Gold GC=F)", header_style="bold green", border_style="dim")
+        overview_table.add_column("Metric", style="cyan")
+        overview_table.add_column("Value", justify="right", style="bold white")
+
+        pnl_col = "green" if tv_metrics["net_profit"] >= 0 else "red"
+        overview_table.add_row("Net Profit", f"[{pnl_col}]${tv_metrics['net_profit']:,.2f} ({tv_metrics['net_profit_pct']:.2f}%)[/{pnl_col}]")
+        overview_table.add_row("Gross Profit", f"${tv_metrics['gross_profit']:,.2f}")
+        overview_table.add_row("Gross Loss", f"-${tv_metrics['gross_loss']:,.2f}")
+        overview_table.add_row("Profit Factor", f"{tv_metrics['profit_factor']:.2f}")
+        overview_table.add_row("Max Drawdown", f"-{abs(tv_metrics['max_drawdown']*100):.2f}%")
+        overview_table.add_row("Total Closed Trades", str(tv_metrics["total_trades"]))
+        overview_table.add_row("Percent Profitable (Win Rate)", f"{tv_metrics['win_rate']:.1f}%")
+        overview_table.add_row("Average Trade PnL", f"${tv_metrics['avg_trade']:,.2f}")
+        overview_table.add_row("Average Win / Average Loss", f"${tv_metrics['avg_win']:,.2f} / ${tv_metrics['avg_loss']:,.2f}")
+        overview_table.add_row("Payoff Ratio", f"{tv_metrics['payoff_ratio']:.2f}")
+        overview_table.add_row("Sharpe Ratio", f"{tv_metrics['sharpe']:.2f}")
+        overview_table.add_row("Sortino Ratio", f"{tv_metrics['sortino']:.2f}")
+        overview_table.add_row("Calmar Ratio", f"{tv_metrics['calmar']:.2f}")
+        overview_table.add_row("Max Consecutive Wins / Losses", f"{tv_metrics['max_consecutive_wins']} / {tv_metrics['max_consecutive_losses']}")
+
+        console.print(overview_table)
+        console.print()
+
+        robustness_dict = {
+            "sharpe": tv_metrics["sharpe"],
+            "sortino": tv_metrics["sortino"],
+            "calmar": tv_metrics["calmar"],
+            "max_dd": abs(tv_metrics["max_drawdown"] * 100.0),
+            "dsr": dsr_val,
+            "pbo": pbo_val,
+            "mc_ci_lower": mc_res["ci_95_lower"],
+            "mc_ci_upper": mc_res["ci_95_upper"],
+            "mc_max_dd_95": mc_res["max_dd_95"],
+        }
+
+        chart_path = run_dir / "strategy_dashboard.png"
+        plot_strategy_dashboard(
+            equity_curves=multi_equity_curves,
+            trades=primary_backtest["raw_result"].trades,
+            robustness_stats=robustness_dict,
+            title="Institutional Strategy Performance & Statistical Robustness Dashboard",
+            initial_cash=initial_cash,
+            save_path=str(chart_path),
+        )
+
+        console.print(f"[bold green][PASS] Saved Strategy Dashboard Plot to:[/bold green] [bold cyan]{chart_path.resolve()}[/bold cyan]")
+        console.print()
+
+    # Save multi_equity_curves chart to run folder
+    if multi_equity_curves:
+        generate_multi_equity_curve_chart(multi_equity_curves, run_dir, name="matrix_equity")
 
     # Capture Reproducibility Environment Snapshot
     capture_environment_snapshot(output_dir=run_dir)
