@@ -13,6 +13,8 @@ import polars as pl
 
 from ssbt.core.events import Bar, BidAsk
 
+from ssbt.exceptions import DataError
+
 _BAR_COLUMNS = {"timestamp", "open", "high", "low", "close", "volume"}
 _BA_COLUMNS = {"timestamp", "bid", "ask"}
 
@@ -23,10 +25,10 @@ def _detect_columns(df: pl.DataFrame, symbol: str) -> str:
         return "bar"
     if _BA_COLUMNS.issubset(cols):
         return "ba"
-    raise ValueError(
-        f"Cannot detect data type for {symbol}. "
-        f"Need columns: {_BAR_COLUMNS} (bar) or {_BA_COLUMNS} (bid/ask). "
-        f"Got: {cols}"
+    raise DataError(
+        message=f"Cannot detect valid OHLCV or Bid/Ask market data schema for symbol '{symbol}'. Got columns: {list(df.columns)}",
+        hint=f"Ensure your Polars DataFrame has columns {_BAR_COLUMNS} (for bars) or {_BA_COLUMNS} (for bid/ask quotes). Example: df.rename({{'Date': 'timestamp', 'Close': 'close'}})",
+        context={"symbol": symbol, "found_columns": list(df.columns)},
     )
 
 
