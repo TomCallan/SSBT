@@ -4,6 +4,7 @@
 - **Branch**: `dev-generic-exploration-engine-plan`
 - **Goal**: Generic event-driven exploration engine & backtester with real-time IPC streaming, anti-lookahead auditing, overfitting defense (DSR/PBO), market microstructure realism (partial fills, worst-case execution), reproducibility rerun system, and GUI integration.
 - **Progress**: M0-M7 COMPLETE (100%) + Institutional Quant Hardening COMPLETE (100%) + Quant Due-Diligence Checklist COMPLETE (100%).
+- **Scope Status**: HARD SCOPE FREEZE — Feature set is locked. All future work focuses strictly on UX refinement, API ergonomics, documentation clarity, error handling, performance tuning, and user value proposition alignment.
 
 ## Milestone Status
 ```
