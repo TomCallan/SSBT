@@ -370,6 +370,44 @@ def plot_walk_forward_dashboard(
     return fig
 
 
+def plot_l3_orderbook_dashboard(
+    queue_history: list[dict[str, Any]],
+    title: str = "High-Frequency L3 Orderbook Queue Depletion & Microstructure Audit",
+    save_path: str | None = None,
+):
+    """Plot 2-panel L3 Orderbook Queue Priority & Depletion Chart."""
+    plt = _import_mpl()
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(13, 7), gridspec_kw={"height_ratios": [2.5, 2.0]})
+
+    timestamps = [q["timestamp"] for q in queue_history]
+    prices = [q["trade_price"] for q in queue_history]
+    v_aheads = [q["volume_ahead"] for q in queue_history]
+
+    # --- Panel 1: Trade Execution Price Stream ---
+    ax1.plot(timestamps, prices, label="Trade Execution Price ($)", color="#1E88E5", linewidth=1.8, marker="o", markersize=3)
+    ax1.set_ylabel("Price ($)", fontweight="bold")
+    ax1.set_title(title, fontsize=13, fontweight="bold", pad=10)
+    ax1.legend(loc="upper left", framealpha=0.85)
+    ax1.grid(True, alpha=0.25)
+
+    # --- Panel 2: Volume Ahead Queue Depletion ($V_{ahead}$) ---
+    ax2.plot(timestamps, v_aheads, label="Volume Ahead in Queue ($V_{ahead}$)", color="#D81B60", linewidth=2.0)
+    ax2.fill_between(timestamps, v_aheads, 0, color="#D81B60", alpha=0.15)
+    ax2.axhline(0.0, color="#2E7D32", linestyle="--", alpha=0.8, label="Front of Queue (Order Fills)")
+    ax2.set_ylabel("Queue Vol Ahead", fontweight="bold")
+    ax2.set_xlabel("Timestamp Step", fontweight="bold")
+    ax2.legend(loc="upper right", framealpha=0.85)
+    ax2.grid(True, alpha=0.25)
+
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=150)
+        plt.close()
+        return None
+    plt.show()
+    return fig
+
+
 def plot(data: any, title: str | None = None, save_path: str | None = None):
     """Universal 1-line visual plotting engine for SSBT.
     
