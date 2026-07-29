@@ -24,6 +24,7 @@ from ssbt.analytics.metrics import compute_metrics, format_metrics, compute_trad
 from ssbt.analytics.plots import (
     plot_equity_curve, plot_drawdown, plot_trades,
     plot_strategy_dashboard, plot_tradingview_dashboard,
+    plot_robustness_dashboard, plot_performance_metrics,
     plot, autoplot,
 )
 from ssbt.events.base import BaseEvent

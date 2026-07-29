@@ -117,24 +117,17 @@ def plot_strategy_dashboard(
     prices: np.ndarray | None = None,
     dates: list | np.ndarray | None = None,
     robustness_stats: dict[str, Any] | None = None,
-    title: str = "Institutional Strategy Performance & Statistical Robustness Dashboard",
+    title: str = "Institutional Multi-Asset Performance Dashboard",
     initial_cash: float = 5000.0,
     save_path: str | None = None,
 ):
-    """Plot comprehensive 4-panel Quantitative Performance & Robustness Dashboard.
-    
-    Panel 1: Multi-Asset / Strategy Equity Curves ($) vs Capital Baseline
-    Panel 2: Underwater Drawdown Curves (%)
-    Panel 3: Per-Trade PnL Distribution Sequence ($)
-    Panel 4: Performance & Overfitting Audit Metric Card (Sharpe, Sortino, DSR, PBO, Monte Carlo)
-    """
+    """Plot clean 3-panel Multi-Asset Strategy Dashboard (Equity, Drawdown, Trade PnL)."""
     plt = _import_mpl()
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(
-        4, 1, figsize=(14, 13),
-        gridspec_kw={"height_ratios": [3.0, 2.0, 2.0, 2.2]}
+    fig, (ax1, ax2, ax3) = plt.subplots(
+        3, 1, figsize=(13, 9.5),
+        gridspec_kw={"height_ratios": [3.2, 2.2, 2.2]}
     )
 
-    # Standardize equity curves input into a dictionary of symbol -> 2D numpy array
     eq_dict: dict[str, np.ndarray] = {}
     if isinstance(equity_curves, dict):
         eq_dict = equity_curves
@@ -144,7 +137,7 @@ def plot_strategy_dashboard(
     colors = ["#2E7D32", "#00ACC1", "#FB8C00", "#8E24AA", "#D81B60", "#1E88E5"]
 
     # --- Panel 1: Multi-Asset Equity Curves ---
-    ax1.set_title(title, fontsize=14, fontweight="bold", pad=12)
+    ax1.set_title(title, fontsize=13, fontweight="bold", pad=10)
     for idx, (sym, eq_arr) in enumerate(eq_dict.items()):
         if eq_arr is None or len(eq_arr) == 0:
             continue
@@ -163,7 +156,7 @@ def plot_strategy_dashboard(
     ax1.legend(loc="upper left", framealpha=0.85)
     ax1.grid(True, alpha=0.25)
 
-    # --- Panel 2: Underwater Drawdown Curves (%) ---
+    # --- Panel 2: Multi-Asset Underwater Drawdown Curves (%) ---
     for idx, (sym, eq_arr) in enumerate(eq_dict.items()):
         if eq_arr is None or len(eq_arr) == 0:
             continue
@@ -181,7 +174,7 @@ def plot_strategy_dashboard(
     ax2.legend(loc="lower left", framealpha=0.85)
     ax2.grid(True, alpha=0.25)
 
-    # --- Panel 3: Per-Trade PnL Distribution Sequence ---
+    # --- Panel 3: Per-Trade PnL Sequence ---
     if trades:
         trade_pnls = [t.pnl for t in trades]
         trade_x = np.arange(1, len(trade_pnls) + 1)
@@ -197,40 +190,107 @@ def plot_strategy_dashboard(
         ax3.text(0.5, 0.5, "No Closed Trades Record Available", ha="center", va="center", fontsize=11, color="#757575")
         ax3.set_ylabel("Trade PnL ($)", fontweight="bold")
 
-    # --- Panel 4: Performance & Overfitting Robustness Table Card ---
-    ax4.axis("off")
-    stats = robustness_stats or {}
-    
-    table_data = [
-        ["Metric Category", "Quantitative Metric Name", "Empirical Value", "Institutional Requirement / Status"],
-        ["Performance Overview", "Sharpe Ratio", f"{stats.get('sharpe', 0.0):.2f}", "PASS (> 1.5 Target)"],
-        ["Performance Overview", "Sortino Ratio", f"{stats.get('sortino', 0.0):.2f}", "PASS (> 1.5 Target)"],
-        ["Performance Overview", "Calmar Ratio", f"{stats.get('calmar', 0.0):.2f}", "PASS (> 2.0 Target)"],
-        ["Performance Overview", "Max Drawdown (%)", f"{stats.get('max_dd', 0.0):.2f}%", "PASS (< 15.0% Limit)"],
-        ["Overfitting Defense", "Deflated Sharpe Ratio (DSR)", f"{stats.get('dsr', 1.0)*100.0:.1f}%", "PASS (> 95% Confidence)"],
-        ["Overfitting Defense", "Probability of Overfitting (PBO)", f"{stats.get('pbo', 0.0)*100.0:.1f}%", "PASS (< 50% Overfit Risk)"],
-        ["Monte Carlo Resampling", "95% CI Lower Equity", f"${stats.get('mc_ci_lower', 5000.0):,.2f}", "PASS (Capital Intact)"],
-        ["Monte Carlo Resampling", "95% CI Upper Equity", f"${stats.get('mc_ci_upper', 8000.0):,.2f}", "STRENGTH"],
-        ["Monte Carlo Resampling", "95th Percentile Max Drawdown", f"{stats.get('mc_max_dd_95', 0.0)*100.0:.2f}%", "PASS (< 15.0% Limit)"],
-    ]
-
-    tbl = ax4.table(
-        cellText=table_data,
-        loc="center",
-        cellLoc="center",
-        colWidths=[0.22, 0.28, 0.20, 0.30]
-    )
-    tbl.auto_set_font_size(False)
-    tbl.set_fontsize(9)
-    tbl.scale(1.0, 1.25)
-
-    # Style table headers
-    for i in range(4):
-        tbl[(0, i)].get_text().set_fontweight("bold")
-        tbl[(0, i)].set_facecolor("#37474F")
-        tbl[(0, i)].get_text().set_color("white")
-
     plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=150)
+        plt.close()
+        return None
+    plt.show()
+    return fig
+
+
+def plot_robustness_dashboard(
+    dsr_val: float = 1.0,
+    pbo_val: float = 0.04,
+    mc_res: dict[str, Any] | None = None,
+    title: str = "Statistical Robustness & Overfitting Defense Audit",
+    save_path: str | None = None,
+):
+    """Plot dedicated 2-panel Statistical Overfitting & Monte Carlo Audit Chart."""
+    plt = _import_mpl()
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5))
+
+    # --- Panel 1: DSR & PBO Bar Visual ---
+    categories = ["Deflated Sharpe Ratio\n(DSR %)", "Probability of Overfitting\n(PBO %)"]
+    vals = [dsr_val * 100.0, pbo_val * 100.0]
+    bar_cols = ["#2E7D32" if dsr_val >= 0.95 else "#FB8C00", "#2E7D32" if pbo_val < 0.50 else "#C62828"]
+
+    bars = ax1.bar(categories, vals, color=bar_cols, width=0.45, zorder=4)
+    ax1.axhline(95.0, color="#2E7D32", linestyle="--", alpha=0.7, label="DSR Pass Threshold (95%)")
+    ax1.axhline(50.0, color="#C62828", linestyle=":", alpha=0.7, label="PBO High-Risk Limit (50%)")
+
+    for bar, val in zip(bars, vals):
+        ax1.text(bar.get_x() + bar.get_width()/2.0, bar.get_height() + 1.5, f"{val:.1f}%", ha="center", va="bottom", fontweight="bold", fontsize=10)
+
+    ax1.set_ylim(0, 115)
+    ax1.set_ylabel("Percentage (%)", fontweight="bold")
+    ax1.set_title("Statistical Overfitting Defenses", fontsize=12, fontweight="bold")
+    ax1.legend(loc="upper right", framealpha=0.85)
+    ax1.grid(True, alpha=0.25)
+
+    # --- Panel 2: Monte Carlo Trade Resampling Confidence Interval ---
+    mc = mc_res or {"ci_95_lower": 5000.0, "ci_95_upper": 8500.0, "max_dd_95": -0.10}
+    mc_lower = mc.get("ci_95_lower", 5000.0)
+    mc_upper = mc.get("ci_95_upper", 8500.0)
+    mc_max_dd = mc.get("max_dd_95", -0.10) * 100.0
+
+    mc_labels = ["95% CI Lower Equity", "95% CI Upper Equity", "95th %ile Max Drawdown"]
+    mc_vals = [mc_lower, mc_upper, mc_max_dd]
+    mc_colors = ["#1E88E5", "#2E7D32", "#C62828"]
+
+    ax2.bar(mc_labels, [mc_lower, mc_upper, 0], color=mc_colors[:2], width=0.4, label="Equity Range ($)")
+    ax2.set_ylabel("Account Equity ($)", fontweight="bold")
+    ax2.set_title("Monte Carlo 1,000 Resampling Audit", fontsize=12, fontweight="bold")
+    
+    for idx, (lbl, val) in enumerate(zip(mc_labels[:2], [mc_lower, mc_upper])):
+        ax2.text(idx, val + 150, f"${val:,.2f}", ha="center", va="bottom", fontweight="bold", fontsize=10)
+
+    ax2.grid(True, alpha=0.25)
+
+    fig.suptitle(title, fontsize=14, fontweight="bold", y=1.02)
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=150)
+        plt.close()
+        return None
+    plt.show()
+    return fig
+
+
+def plot_performance_metrics(
+    matrix_results: list[dict[str, Any]],
+    title: str = "Multi-Asset Performance Ratios Comparison",
+    save_path: str | None = None,
+):
+    """Plot bar chart comparison of Sharpe, Sortino, Net Return, and Max Drawdown across matrix assets."""
+    plt = _import_mpl()
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5))
+
+    tickers = [r["ticker"] for r in matrix_results]
+    sharpes = [r.get("sharpe", 0.0) for r in matrix_results]
+    returns = [r.get("net_profit_pct", 0.0) for r in matrix_results]
+    drawdowns = [abs(r.get("max_dd", 0.0)) for r in matrix_results]
+
+    x = np.arange(len(tickers))
+    width = 0.35
+
+    ax1.bar(x - width/2, sharpes, width, label="Sharpe Ratio", color="#1E88E5")
+    ax1.bar(x + width/2, returns, width, label="Return (%)", color="#2E7D32")
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(tickers, fontweight="bold")
+    ax1.set_title("Sharpe Ratio & Net Return (%)", fontsize=12, fontweight="bold")
+    ax1.legend(loc="upper right")
+    ax1.grid(True, alpha=0.25)
+
+    ax2.bar(tickers, drawdowns, color="#C62828", width=0.4, label="Max Drawdown (%)")
+    ax2.set_title("Max Drawdown Depth (%)", fontsize=12, fontweight="bold")
+    ax2.set_ylabel("Drawdown (%)", fontweight="bold")
+    ax2.grid(True, alpha=0.25)
+
+    fig.suptitle(title, fontsize=14, fontweight="bold", y=1.02)
+    plt.tight_layout()
+
     if save_path:
         plt.savefig(save_path, dpi=150)
         plt.close()

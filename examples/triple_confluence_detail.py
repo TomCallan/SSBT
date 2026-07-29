@@ -349,7 +349,24 @@ def main():
     console.print(audit_table)
     console.print()
 
-    # Render Strategy Overview & Multi-Asset Plot Dashboard
+    # Save dedicated Statistical Robustness & Overfitting Plot (robustness_audit.png)
+    from ssbt.analytics.plots import plot_robustness_dashboard, plot_performance_metrics
+    plot_robustness_dashboard(
+        dsr_val=dsr_val,
+        pbo_val=pbo_val,
+        mc_res=mc_res,
+        title="Statistical Overfitting Defenses & Monte Carlo Audit",
+        save_path=str(run_dir / "robustness_audit.png"),
+    )
+
+    # Save dedicated Multi-Asset Performance Metrics Plot (performance_metrics.png)
+    plot_performance_metrics(
+        matrix_results=matrix_results,
+        title="Multi-Asset Performance Ratios & Drawdowns Comparison",
+        save_path=str(run_dir / "performance_metrics.png"),
+    )
+
+    # Render Strategy Performance Overview Table & 3-Panel Strategy Dashboard
     if primary_res is not None:
         pl_1d_primary, primary_backtest = primary_res
         tv_metrics = compute_tradingview_overview(
@@ -391,24 +408,11 @@ def main():
         console.print(overview_table)
         console.print()
 
-        robustness_dict = {
-            "sharpe": tv_metrics["sharpe"],
-            "sortino": tv_metrics["sortino"],
-            "calmar": tv_metrics["calmar"],
-            "max_dd": abs(tv_metrics["max_drawdown"] * 100.0),
-            "dsr": dsr_val,
-            "pbo": pbo_val,
-            "mc_ci_lower": mc_res["ci_95_lower"],
-            "mc_ci_upper": mc_res["ci_95_upper"],
-            "mc_max_dd_95": mc_res["max_dd_95"],
-        }
-
         chart_path = run_dir / "strategy_dashboard.png"
         plot_strategy_dashboard(
             equity_curves=multi_equity_curves,
             trades=primary_backtest["raw_result"].trades,
-            robustness_stats=robustness_dict,
-            title="Institutional Strategy Performance & Statistical Robustness Dashboard",
+            title="Institutional Multi-Asset Strategy Performance Dashboard",
             initial_cash=initial_cash,
             save_path=str(chart_path),
         )
