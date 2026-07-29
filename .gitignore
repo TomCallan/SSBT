@@ -18,3 +18,4 @@ strategies_vault/
 .DS_Store
 *.lock
 !uv.lock
+dev_gui/
