@@ -92,6 +92,10 @@ class InMemoryFeed:
     def n_bars(self) -> int:
         return self._n
 
+    @property
+    def df(self) -> pl.DataFrame:
+        return self._df
+
     def get_dataframe(self, symbol: str | None = None) -> pl.DataFrame:
         return self._df
 

@@ -299,6 +299,77 @@ def plot_performance_metrics(
     return fig
 
 
+def plot_walk_forward_dashboard(
+    wf_res: Any,
+    title: str = "Rolling Walk-Forward Out-of-Sample Performance Dashboard",
+    save_path: str | None = None,
+):
+    """Plot 3-panel Walk-Forward Dashboard (Stitched OOS Equity, IS vs OOS Sharpe per Window, WFE %)."""
+    plt = _import_mpl()
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(13, 10), gridspec_kw={"height_ratios": [3.0, 2.0, 2.0]})
+
+    # --- Panel 1: Stitched Out-of-Sample Equity Curve ---
+    eq = wf_res.stitched_oos_equity
+    ax1.plot(eq, label="Stitched Out-of-Sample Equity ($)", color="#2E7D32", linewidth=2.0)
+    ax1.axhline(eq[0], color="#757575", linestyle="--", alpha=0.6, label=f"Initial Capital (${eq[0]:,.0f})")
+    ax1.set_ylabel("Account Equity ($)", fontweight="bold")
+    ax1.set_title(title, fontsize=13, fontweight="bold", pad=10)
+    ax1.legend(loc="upper left", framealpha=0.85)
+    ax1.grid(True, alpha=0.25)
+
+    # --- Panel 2: IS vs OOS Sharpe per Window ---
+    win_indices = [w.window_index + 1 for w in wf_res.windows]
+    is_sharpes = [w.is_sharpe for w in wf_res.windows]
+    oos_sharpes = [w.oos_sharpe for w in wf_res.windows]
+
+    x = np.arange(len(win_indices))
+    width = 0.35
+
+    ax2.bar(x - width/2, is_sharpes, width, label="In-Sample Sharpe (Training)", color="#1E88E5")
+    ax2.bar(x + width/2, oos_sharpes, width, label="Out-of-Sample Sharpe (Testing)", color="#FB8C00")
+    ax2.set_xticks(x)
+    ax2.set_xticklabels([f"W{i}" for i in win_indices], fontweight="bold")
+    ax2.set_ylabel("Sharpe Ratio", fontweight="bold")
+    ax2.set_title("In-Sample vs Out-of-Sample Sharpe Comparison per Window", fontsize=11, fontweight="bold")
+    ax2.legend(loc="upper right", framealpha=0.85)
+    ax2.grid(True, alpha=0.25)
+
+    # --- Panel 3: Walk-Forward Efficiency (WFE %) Summary Card ---
+    ax3.axis("off")
+    wfe_pct = wf_res.wfe_ratio * 100.0
+    status_str = "PASS (High Robustness > 50%)" if wfe_pct >= 50.0 else "WARNING (Low OOS Efficiency)"
+    
+    summary_data = [
+        ["Walk-Forward Efficiency Metric", "Empirical Result", "Institutional Target / Status"],
+        ["Overall Out-of-Sample Sharpe Ratio", f"{wf_res.overall_oos_sharpe:.2f}", "PASS (> 1.0 Target)"],
+        ["Walk-Forward Efficiency Ratio (WFE)", f"{wfe_pct:.1f}%", status_str],
+        ["Total Rolling Windows Evaluated", f"{len(wf_res.windows)} Windows", "COMPLETED"],
+    ]
+
+    tbl = ax3.table(
+        cellText=summary_data,
+        loc="center",
+        cellLoc="center",
+        colWidths=[0.40, 0.25, 0.35]
+    )
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(10)
+    tbl.scale(1.0, 1.3)
+
+    for i in range(3):
+        tbl[(0, i)].get_text().set_fontweight("bold")
+        tbl[(0, i)].set_facecolor("#37474F")
+        tbl[(0, i)].get_text().set_color("white")
+
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=150)
+        plt.close()
+        return None
+    plt.show()
+    return fig
+
+
 def plot(data: any, title: str | None = None, save_path: str | None = None):
     """Universal 1-line visual plotting engine for SSBT.
     

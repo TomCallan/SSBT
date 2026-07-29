@@ -12,20 +12,23 @@ from ssbt.core.multi_engine import MultiSymbolEngine
 from ssbt.core._numba_kernels import HAS_NUMBA
 from ssbt.data.feed import InMemoryFeed, ParquetFeed
 from ssbt.exceptions import SSBTError, DataError, ExecutionError, AuditError
+from ssbt.optimization import (
+    ParameterSpace, ParamRange, IntParam, FloatParam, ChoiceParam,
+    GridSearchOptimizer, OptimizationResult, WalkForwardOptimizer, WalkForwardResult, WalkForwardWindow,
+)
 from ssbt.strategy.base import Strategy
 from ssbt.portfolio.allocation import (
     AllocationFn, equal_weight, inverse_volatility, custom_allocation,
 )
 from ssbt.analytics.optimization import (
     param_grid, run_sweep, run_matrix_sweep, results_to_dataframe, SweepResult,
-    walk_forward, WalkForwardResult, WalkForwardWindow,
-    BaseOptimizer, GridSearch,
+    walk_forward, BaseOptimizer, GridSearch,
 )
 from ssbt.analytics.metrics import compute_metrics, format_metrics, compute_tradingview_overview
 from ssbt.analytics.plots import (
     plot_equity_curve, plot_drawdown, plot_trades,
     plot_strategy_dashboard, plot_tradingview_dashboard,
-    plot_robustness_dashboard, plot_performance_metrics,
+    plot_robustness_dashboard, plot_performance_metrics, plot_walk_forward_dashboard,
     plot, autoplot,
 )
 from ssbt.events.base import BaseEvent
