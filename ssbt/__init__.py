@@ -11,6 +11,7 @@ from ssbt.core.vectorised import VectorisedBacktester, VectorisedStrategy
 from ssbt.core.multi_engine import MultiSymbolEngine
 from ssbt.core._numba_kernels import HAS_NUMBA
 from ssbt.data.feed import InMemoryFeed, ParquetFeed
+from ssbt.exceptions import SSBTError, DataError, ExecutionError, AuditError
 from ssbt.strategy.base import Strategy
 from ssbt.portfolio.allocation import (
     AllocationFn, equal_weight, inverse_volatility, custom_allocation,
