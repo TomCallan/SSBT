@@ -7,6 +7,15 @@ from ssbt.service.errors import (
     ErrorSpec,
     ServiceError,
 )
+from ssbt.service.jobs import (
+    JobInfo,
+    JobManager,
+    JobStatus,
+    cancel_job,
+    get_job_status,
+    start_job,
+    subscribe_job_stream,
+)
 from ssbt.service.rerun import compare, rerun
 from ssbt.service.runner import _compute_config_hash, run_backtest, run_backtest_async
 from ssbt.service.schemas import (
@@ -37,4 +46,12 @@ __all__ = [
     "run_backtest_async",
     "rerun",
     "compare",
+    "JobStatus",
+    "JobInfo",
+    "JobManager",
+    "start_job",
+    "get_job_status",
+    "cancel_job",
+    "subscribe_job_stream",
 ]
+
