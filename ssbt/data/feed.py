@@ -6,7 +6,8 @@ Performance: InMemoryFeed caches NumPy arrays. to_arrays() for engine fast path.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Union
+from pathlib import Path
+from typing import Any, Union
 
 import numpy as np
 import polars as pl
@@ -56,6 +57,42 @@ def _normalise_ba_df(df: pl.DataFrame) -> pl.DataFrame:
         pl.col("bid").cast(pl.Float64),
         pl.col("ask").cast(pl.Float64),
     ]).sort("timestamp")
+
+
+def normalise_market_data(data: Any, symbol: str = "ASSET") -> pl.DataFrame:
+    """Normalize any input data into a clean Polars DataFrame with integer millisecond timestamps."""
+
+    if isinstance(data, pl.DataFrame):
+        df = data
+    elif hasattr(data, "to_polars"):
+        df = data.to_polars()
+    elif type(data).__module__.startswith("pandas"):
+        df = pl.from_pandas(data)
+    elif isinstance(data, dict):
+        df = pl.DataFrame(data)
+    elif isinstance(data, (str, Path)):
+        p = Path(data)
+        if p.suffix == ".parquet":
+            df = pl.read_parquet(p)
+        else:
+            df = pl.read_csv(p)
+    else:
+        raise TypeError(f"Unsupported data format: {type(data)}")
+
+    if "timestamp" in df.columns:
+        if df["timestamp"].dtype in (pl.Datetime, pl.Date):
+            df = df.with_columns(pl.col("timestamp").dt.epoch("ms"))
+    elif "Date" in df.columns:
+        df = df.rename({"Date": "timestamp"})
+        if df["timestamp"].dtype in (pl.Datetime, pl.Date):
+            df = df.with_columns(pl.col("timestamp").dt.epoch("ms"))
+    elif "date" in df.columns:
+        df = df.rename({"date": "timestamp"})
+        if df["timestamp"].dtype in (pl.Datetime, pl.Date):
+            df = df.with_columns(pl.col("timestamp").dt.epoch("ms"))
+
+    return df
+
 
 
 class InMemoryFeed:

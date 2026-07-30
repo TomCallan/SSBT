@@ -7,7 +7,7 @@ import pytest
 
 import ssbt
 from ssbt.quick import quick_backtest, generate_synthetic_bars, strategy, QuickResult
-from ssbt.agent import get_experiment_schema, validate_strategy_script, get_agent_template
+from ssbt.agent import validate_strategy_script, get_agent_template
 from ssbt.cli import main as cli_main
 
 
@@ -57,12 +57,6 @@ def test_quick_backtest_with_strategy_class():
     assert len(result.fills) > 0
 
 
-def test_get_experiment_schema():
-    schema = get_experiment_schema()
-    assert isinstance(schema, dict)
-    assert schema["title"] == "SSBTExperimentSpec"
-    assert "required" in schema
-    assert "events" in schema["properties"]
 
 
 def test_validate_strategy_script(tmp_path):
@@ -100,13 +94,6 @@ def test_get_agent_template():
 
 
 def test_cli_commands(monkeypatch, capsys, tmp_path):
-    # Test `ssbt schema`
-    monkeypatch.setattr("sys.argv", ["ssbt", "schema"])
-    ret = cli_main()
-    assert ret == 0
-    captured = capsys.readouterr()
-    assert "SSBTExperimentSpec" in captured.out
-
     # Test `ssbt template`
     monkeypatch.setattr("sys.argv", ["ssbt", "template", "sma_cross"])
     ret = cli_main()

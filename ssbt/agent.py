@@ -7,71 +7,7 @@ from pathlib import Path
 from typing import Any
 
 
-def get_experiment_schema() -> dict[str, Any]:
-    """Generate JSON Schema definition for SSBT Experiment Specs and YAML configs."""
-    return {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "title": "SSBTExperimentSpec",
-        "type": "object",
-        "required": ["version", "name", "data", "events", "outcomes"],
-        "properties": {
-            "version": {
-                "type": "string",
-                "enum": ["1.0", "1"],
-                "description": "Experiment specification format version.",
-            },
-            "name": {
-                "type": "string",
-                "description": "Descriptive unique name for the exploration experiment.",
-            },
-            "description": {
-                "type": "string",
-                "description": "Optional detailed context or hypothesis statement.",
-            },
-            "data": {
-                "type": "object",
-                "required": ["symbols"],
-                "properties": {
-                    "symbols": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of ticker symbols.",
-                    },
-                    "path": {"type": "string", "description": "Parquet data directory or file."},
-                    "resample": {"type": "string", "description": "Bar aggregation time (e.g. 5m, 1h)."},
-                },
-            },
-            "events": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["name"],
-                    "properties": {
-                        "name": {"type": "string"},
-                        "params": {"type": "object"},
-                    },
-                },
-            },
-            "outcomes": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["name"],
-                    "properties": {
-                        "name": {"type": "string"},
-                        "params": {"type": "object"},
-                    },
-                },
-            },
-            "audit": {
-                "type": "object",
-                "properties": {
-                    "output_dir": {"type": "string"},
-                    "enable_signatures": {"type": "boolean"},
-                },
-            },
-        },
-    }
+
 
 
 def validate_strategy_script(code_or_path: str | Path) -> dict[str, Any]:
@@ -158,7 +94,7 @@ def validate_strategy_script(code_or_path: str | Path) -> dict[str, Any]:
 
 
 def get_agent_template(template_name: str = "sma_cross") -> str:
-    """Return standard code or YAML template for AI agents."""
+    """Return standard code template for AI agents or strategy authors."""
     templates = {
         "sma_cross": '''from ssbt import Strategy, Side, Bar, Engine
 
@@ -192,22 +128,6 @@ def momentum_strategy(bar, engine):
     if bar.close > bar.open * 1.01:
         engine.submit_order(ssbt.Strategy.market_order(bar.symbol, ssbt.Side.BUY, 1.0))
 ''',
-        "experiment_yaml": '''version: "1.0"
-name: "sample_exploration"
-description: "Agent-generated signal exploration"
-
-data:
-  symbols: ["BTC-USD"]
-
-events:
-  - name: "breakout"
-    params:
-      lookback: 20
-
-outcomes:
-  - name: "forward_returns"
-    params:
-      horizons: [1, 5, 10]
-''',
     }
     return templates.get(template_name, templates["sma_cross"])
+

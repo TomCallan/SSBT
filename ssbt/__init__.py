@@ -13,7 +13,7 @@ from ssbt.core._numba_kernels import HAS_NUMBA
 from ssbt.data.feed import InMemoryFeed, ParquetFeed
 from ssbt.data.live import LiveStreamFeed, QueueOverflowPolicy
 from ssbt.exceptions import SSBTError, DataError, ExecutionError, AuditError
-from ssbt.strategy.base import Strategy
+from ssbt.strategy.base import Strategy, load_strategy_from_source
 from ssbt.strategy.live_runner import LiveStrategyRunner
 from ssbt.execution import (
     QueuePriorityModel, ExecutionLatencyModel, L3MatchingEngine, QueueOrderTracker,
@@ -40,12 +40,9 @@ from ssbt.analytics.plots import (
 )
 from ssbt.events.base import BaseEvent
 from ssbt.outcomes.base import BaseOutcome
-from ssbt.experiments.specs import ExperimentSpec
-from ssbt.experiments.loader import load_experiment, LoaderError
-from ssbt.experiments.runner import run_experiment, RunnerError
 from ssbt.experiments.registry import Registry, RegistryError
-from ssbt.backtest.adapter import BacktestAdapter
 from ssbt.experiments.reproducibility import capture_environment_snapshot
+from ssbt.backtest.adapter import BacktestAdapter
 from ssbt.data.point_in_time import align_multi_timeframe, validate_point_in_time_join, CausalityViolationError
 from ssbt.data.orderbook import rebuild_orderbook_from_bars, OrderBookEngine, OrderBookFeed, OrderBookQuote
 from ssbt.data.universal_tick import UniversalTickStream, UniversalTickFeed
@@ -91,7 +88,6 @@ from ssbt.quick import (
     generate_synthetic_bars,
 )
 from ssbt.agent import (
-    get_experiment_schema,
     validate_strategy_script,
     get_agent_template,
 )
@@ -151,11 +147,9 @@ __all__ = [
     "compute_metrics", "format_metrics", "HAS_NUMBA",
     # Ergonomics & Agent Tooling
     "quick_backtest", "QuickResult", "strategy", "generate_synthetic_bars",
-    "get_experiment_schema", "validate_strategy_script", "get_agent_template",
-    # Exploration Engine & Plugins
-    "BaseEvent", "BaseOutcome", "ExperimentSpec",
-    "load_experiment", "LoaderError",
-    "run_experiment", "RunnerError",
+    "validate_strategy_script", "get_agent_template", "load_strategy_from_source",
+    # Exploration Engine Plugins
+    "BaseEvent", "BaseOutcome",
     "Registry", "RegistryError",
     "BacktestAdapter",
     # Audit, Overfitting Defense, Microstructure & IPC Streaming

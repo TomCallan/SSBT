@@ -2,7 +2,7 @@
 
 ## Current Status
 - **Branch**: `dev-generic-exploration-engine-plan`
-- **Goal**: Generic event-driven exploration engine & backtester with real-time IPC streaming, anti-lookahead auditing, overfitting defense (DSR/PBO), market microstructure realism (partial fills, worst-case execution), reproducibility rerun system, and GUI integration.
+- **Goal**: Super fast, event-driven, market-accurate backtesting engine & generic strategy exploration framework with real-time IPC streaming, anti-lookahead auditing, overfitting defense (DSR/PBO), market microstructure realism (partial fills, worst-case execution), reproducibility rerun system, and GUI integration.
 - **Progress**: M0-M7 COMPLETE (100%) + Institutional Quant Hardening COMPLETE (100%) + Quant Due-Diligence Checklist COMPLETE (100%).
 - **Scope Status**: HARD SCOPE FREEZE — Feature set is locked. All future work focuses strictly on UX refinement, API ergonomics, documentation clarity, error handling, performance tuning, and user value proposition alignment.
 
@@ -19,13 +19,15 @@ M7 [X] 100% Hardening, Orderbook Engine, Partial Fills, Rerun Engine & Real-Time
 ```
 
 ## Key Architectural Principles & Controls
-1. Data Ingestion Philosophy: SSBT harnesses zero internal data downloading APIs; external data is supplied as Polars DataFrames into `InMemoryFeed` or pushed live into `LiveStreamFeed`.
-3. Worst-Case Adverse Execution: Pending orders match in conservative order ("fills against position then for"), evaluating stop-loss orders prior to profit target fills.
-4. Orderbook Engine & Partial Fills: Reconstruct synthetic L2 depth quotes (`rebuild_orderbook_from_bars`) and support `OrderStatus.PARTIALLY_FILLED`.
-5. Anti-Lookahead Causality & Point-In-Time Integrity: Validate timestamp causality using `AuditLogger`, `align_multi_timeframe()`, and emit SHA-256 integrity signatures and `simulation_assumptions_report.json`.
-6. Immutable Reproducibility: Capture environment snapshots (`environment_snapshot.json`) and verify 100% deterministic rerun fidelity using `uv run python -m ssbt.cli.rerun <run_id>`.
-7. Statistical Overfitting Defense: Calculate Deflated Sharpe Ratio (`deflated_sharpe_ratio`), Probability of Backtest Overfitting (`probability_of_backtest_overfitting`), and Monte Carlo trade sequence permutations.
-8. Zero-Allocation Loops: Leverage Polars Arrow memory and Numba pre-allocated bar loops for high-throughput backtesting (>1,000,000 bars/sec).
+1. Zero Emojis Rule: NEVER use emojis in documentation, reports, code comments, CLI outputs, or agent responses. Maintain clean, professional, terse quantitative output at all times.
+2. Mission Statement: SSBT is built to be a super fast, event-driven, market-accurate backtesting engine.
+3. Data Ingestion Philosophy: SSBT harnesses zero internal data downloading APIs; external data is supplied as Polars DataFrames into `InMemoryFeed` or pushed live into `LiveStreamFeed`.
+4. Worst-Case Adverse Execution: Pending orders match in conservative order ("fills against position then for"), evaluating stop-loss orders prior to profit target fills.
+5. Orderbook Engine & Partial Fills: Reconstruct synthetic L2 depth quotes (`rebuild_orderbook_from_bars`) and support `OrderStatus.PARTIALLY_FILLED`.
+6. Anti-Lookahead Causality & Point-In-Time Integrity: Validate timestamp causality using `AuditLogger`, `align_multi_timeframe()`, and emit SHA-256 integrity signatures and `simulation_assumptions_report.json`.
+7. Immutable Reproducibility: Capture environment snapshots (`environment_snapshot.json`) and verify 100% deterministic rerun fidelity using `uv run python -m ssbt.cli.rerun <run_id>`.
+8. Statistical Overfitting Defense: Calculate Deflated Sharpe Ratio (`deflated_sharpe_ratio`), Probability of Backtest Overfitting (`probability_of_backtest_overfitting`), and Monte Carlo trade sequence permutations.
+9. Zero-Allocation Loops: Leverage Polars Arrow memory and Numba pre-allocated bar loops for high-throughput backtesting (>1,000,000 bars/sec).
 
 ## Key Package APIs
 - Core Strategy Base: `from ssbt import Strategy, Side, Order, OrderType, OrderStatus, Bar`
@@ -43,7 +45,7 @@ M7 [X] 100% Hardening, Orderbook Engine, Partial Fills, Rerun Engine & Real-Time
 
 ## Testing Commands
 ```bash
-# Run full pytest suite (165 unit & integration tests)
+# Run full pytest suite (257 unit & integration tests)
 uv run python -m pytest ssbt/tests/ -v
 
 # Run deterministic rerun CLI verifier

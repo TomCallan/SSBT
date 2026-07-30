@@ -126,7 +126,7 @@ Rules:
 
 ## 7) Execution Pipeline (Runtime)
 
-1. Parse YAML config.
+1. Parse JSON config.
 2. Validate schema and defaults.
 3. Resolve dataset and feature dependencies.
 4. Materialize features.
@@ -146,7 +146,7 @@ Per run directory:
 ```text
 artifacts/<run_id>/
   manifest.json
-  config.resolved.yaml
+  config.resolved.json
   events.parquet
   outcomes.parquet
   summary_overall.csv

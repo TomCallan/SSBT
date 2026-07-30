@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Any
 
+import numpy as np
 import polars as pl
 
 from ssbt.core.events import Bar, BidAsk, Order, OrderStatus, OrderType, Side, TimeInForce
@@ -65,3 +68,59 @@ class Strategy(ABC):
         return Order(id=0, symbol=symbol, side=side, type=OrderType.TRAILING_STOP, qty=qty,
                      trail_offset=trail_offset, trail_is_pct=is_pct, tif=tif, expire_at=expire_at,
                      status=OrderStatus.PENDING)
+
+
+def load_strategy_from_source(
+    source: str | Path | Strategy | type[Strategy] | Any,
+    strategy_name: str | None = None,
+    kwargs: dict | None = None,
+) -> Strategy:
+    """Instantiate a Strategy from a file path, Python code string, Strategy subclass, instance, or function."""
+    kwargs = kwargs or {}
+    if isinstance(source, Strategy):
+        return source
+    if isinstance(source, type) and issubclass(source, Strategy):
+        return source(**kwargs)
+    if callable(source) and not isinstance(source, type):
+        from ssbt.quick import FunctionalStrategy
+        return FunctionalStrategy(source)
+
+    code_text = ""
+    if isinstance(source, Path) or (isinstance(source, str) and (source.endswith(".py") or Path(source).exists())):
+        p = Path(source)
+        if p.exists() and p.is_file():
+            code_text = p.read_text(encoding="utf-8")
+        else:
+            code_text = str(source)
+    else:
+        code_text = str(source)
+
+    namespace: dict[str, Any] = {
+        "Strategy": Strategy,
+        "Side": Side,
+        "Order": Order,
+        "OrderType": OrderType,
+        "OrderStatus": OrderStatus,
+        "Bar": Bar,
+        "BidAsk": BidAsk,
+        "pl": pl,
+        "np": np,
+    }
+    exec(code_text, namespace)
+
+    strat_cls = None
+    if strategy_name and strategy_name in namespace:
+        val = namespace[strategy_name]
+        if isinstance(val, type) and issubclass(val, Strategy) and val is not Strategy:
+            strat_cls = val
+    if strat_cls is None:
+        for v in namespace.values():
+            if isinstance(v, type) and issubclass(v, Strategy) and v is not Strategy:
+                strat_cls = v
+                break
+
+    if strat_cls is None:
+        raise ValueError(f"No subclass of Strategy found in provided code source ({source})")
+
+    return strat_cls(**kwargs)
+

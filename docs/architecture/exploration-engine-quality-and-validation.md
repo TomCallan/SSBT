@@ -9,7 +9,7 @@
 - Registry lookup and plugin conflicts
 
 ## Integration Tests
-- End-to-end run from YAML to artifacts
+- End-to-end run from JSON config to artifacts
 - Multi-group aggregation correctness
 - Filter semantics (`pre_event`, `post_event`)
 

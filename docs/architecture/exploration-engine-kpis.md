@@ -2,7 +2,7 @@
 
 ## 1) Product/Research KPIs
 
-- **Hypothesis cycle time**: median time from new YAML spec to first results.
+- **Hypothesis cycle time**: median time from new JSON config to first results.
 - **Experiment repeatability**: percent of reruns producing matching summary outputs under pinned data.
 - **Coverage of analysis**: percent of experiments with confidence intervals enabled.
 - **Insight yield proxy**: number of experiments that pass minimum evidence thresholds.

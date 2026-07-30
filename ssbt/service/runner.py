@@ -69,62 +69,9 @@ def _compute_config_hash(req: BacktestRequest) -> str:
 
 
 def _instantiate_strategy(spec: StrategySpec) -> ssbt.Strategy:
-    if spec.code:
-        namespace: dict[str, Any] = {
-            "Strategy": ssbt.Strategy,
-            "Side": ssbt.Side,
-            "Order": ssbt.Order,
-            "OrderType": ssbt.OrderType,
-            "OrderStatus": ssbt.OrderStatus,
-            "Bar": ssbt.Bar,
-            "BidAsk": ssbt.BidAsk,
-            "Engine": ssbt.Engine,
-            "pl": pl,
-            "np": np,
-        }
-        try:
-            exec(spec.code, namespace)
-        except Exception as e:
-            raise ServiceError(
-                code=E_STRATEGY_INIT,
-                message=f"Failed to compile strategy code: {e}",
-                hint="Check strategy Python code syntax and imports",
-                details={"error": str(e)},
-            ) from e
+    from ssbt.strategy.base import load_strategy_from_source
 
-        strat_cls = None
-        if (
-            spec.name
-            and spec.name in namespace
-            and isinstance(namespace[spec.name], type)
-            and issubclass(namespace[spec.name], ssbt.Strategy)
-            and namespace[spec.name] is not ssbt.Strategy
-        ):
-            strat_cls = namespace[spec.name]
-        else:
-            for k, v in namespace.items():
-                if isinstance(v, type) and issubclass(v, ssbt.Strategy) and v is not ssbt.Strategy:
-                    strat_cls = v
-                    break
-
-        if strat_cls is None:
-            raise ServiceError(
-                code=E_STRATEGY_INIT,
-                message=f"No subclass of Strategy found in provided code (spec name: '{spec.name}')",
-                hint="Ensure your strategy code defines a class inheriting from Strategy",
-            )
-
-        try:
-            kwargs = spec.kwargs or {}
-            return strat_cls(**kwargs)
-        except Exception as e:
-            raise ServiceError(
-                code=E_STRATEGY_INIT,
-                message=f"Failed to instantiate strategy '{strat_cls.__name__}': {e}",
-                hint="Verify strategy kwargs match __init__ signature",
-                details={"error": str(e)},
-            ) from e
-    else:
+    if not spec.code:
         if spec.name and hasattr(ssbt, spec.name):
             cls = getattr(ssbt, spec.name)
             if isinstance(cls, type) and issubclass(cls, ssbt.Strategy) and cls is not ssbt.Strategy:
@@ -139,6 +86,17 @@ def _instantiate_strategy(spec: StrategySpec) -> ssbt.Strategy:
             message=f"Strategy code missing for custom strategy '{spec.name}'",
             hint="Provide strategy code string in StrategySpec.code",
         )
+
+    try:
+        return load_strategy_from_source(spec.code, strategy_name=spec.name, kwargs=spec.kwargs)
+    except Exception as e:
+        raise ServiceError(
+            code=E_STRATEGY_INIT,
+            message=f"Failed to compile or instantiate strategy code: {e}",
+            hint="Check strategy Python code syntax, imports, and constructor arguments",
+            details={"error": str(e)},
+        ) from e
+
 
 
 def run_backtest(

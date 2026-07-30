@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable, Sequence, Union
+from typing import Any, Callable, Union
 
 import numpy as np
 import polars as pl
@@ -184,55 +184,26 @@ def quick_backtest(
         plot: If True, renders equity curve plot.
         verbose: If True, displays CLI terminal summary table.
     """
-    # 1. Prepare strategy
-    if isinstance(strategy_input, Strategy):
-        strat = strategy_input
-    elif isinstance(strategy_input, type) and issubclass(strategy_input, Strategy):
-        strat = strategy_input()
-    elif callable(strategy_input):
-        strat = FunctionalStrategy(strategy_input)
-    else:
-        raise TypeError(f"Invalid strategy input: {type(strategy_input)}")
+    from ssbt.strategy.base import load_strategy_from_source
+    from ssbt.data.feed import normalise_market_data
 
-    # Helper to normalise DF timestamp column to int
-    def _to_int_ts(df: pl.DataFrame) -> pl.DataFrame:
-        if df["timestamp"].dtype in (pl.Datetime, pl.Date):
-            return df.with_columns(pl.col("timestamp").dt.epoch("ms"))
-        return df
+    # 1. Prepare strategy
+    strat = load_strategy_from_source(strategy_input)
 
     # 2. Prepare feed
     if isinstance(data, (InMemoryFeed, ParquetFeed)):
         feed = data
-    elif isinstance(data, pl.DataFrame):
-        feed = InMemoryFeed(_to_int_ts(data), symbol=symbol)
-    elif isinstance(data, (str, Path)):
-        path = Path(data)
-        if path.suffix == ".parquet":
-            df = pl.read_parquet(path)
-        else:
-            df = pl.read_csv(path)
-        feed = InMemoryFeed(_to_int_ts(df), symbol=symbol)
-    elif hasattr(data, "to_polars"):
-        feed = InMemoryFeed(_to_int_ts(data.to_polars()), symbol=symbol)
-    elif type(data).__module__.startswith("pandas"):
-        df = pl.from_pandas(data)
-        feed = InMemoryFeed(_to_int_ts(df), symbol=symbol)
-    elif isinstance(data, dict):
-        df = pl.DataFrame(data)
-        feed = InMemoryFeed(_to_int_ts(df), symbol=symbol)
     else:
-        raise TypeError(f"Unsupported data format: {type(data)}")
+        df = normalise_market_data(data, symbol=symbol)
+        feed = InMemoryFeed(df, symbol=symbol)
 
-
-
-    # 3. Instantiate Engine & Run
+    # 3. Run engine
     engine = Engine(feed=feed, strategy=strat, initial_cash=initial_cash)
     res = engine.run()
 
     # 4. Metrics & Summary
     metrics = compute_metrics(res.equity_curve, res.trades)
     quick_res = QuickResult(result=res, metrics=metrics, symbol=symbol)
-
 
     if verbose:
         display_backtest_summary(metrics, initial_cash=initial_cash, symbol=symbol)
