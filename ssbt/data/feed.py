@@ -12,6 +12,7 @@ import numpy as np
 import polars as pl
 
 from ssbt.core.events import Bar, BidAsk
+from ssbt.data.live import LiveStreamFeed
 
 from ssbt.exceptions import DataError
 

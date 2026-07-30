@@ -308,37 +308,19 @@ artifacts/
 
 ---
 
-## Real-Time IPC Streaming & GUI Dashboards
+## Real-Time IPC Event Streaming
 
-Stream engine events to JSON-lines files or socket listeners:
+Stream real-time engine bar events, order submissions, fills, trades, and portfolio equity updates to high-throughput buffered file sinks, sockets, ring buffers, or custom callbacks:
 
 ```python
-from ssbt import ExecutionStreamPublisher
+from ssbt import ExecutionStreamPublisher, BufferedFileSink, SocketIPCSink
 
-publisher = ExecutionStreamPublisher(log_path="artifacts/latest/execution_stream.jsonl")
+# High-throughput buffered IPC file stream
+publisher = ExecutionStreamPublisher(sinks=[
+    BufferedFileSink("artifacts/latest/execution_stream.jsonl", batch_size=500),
+    SocketIPCSink(host="127.0.0.1", port=9999)
+])
 ```
-
-Run interactive Tkinter Desktop GUI:
-```bash
-uv run python gui_examples/desktop_gui.py
-```
-
-Run interactive Web Browser Dashboard GUI:
-```bash
-uv run python gui_examples/web_gui.py
-```
-
----
-
-## Curated Examples Index
-
-| Example Script | Description | Execution Command |
-| :--- | :--- | :--- |
-| **Triple Confluence Suite** | Multi-resolution yfinance streaming, multi-asset matrix test, TradingView metrics overview, DSR/PBO overfitting audit, Monte Carlo resampling, and multi-chart plot exports. | `uv run python examples/triple_confluence_detail.py` |
-| **Institutional Due Diligence** | Runs 10 hard-gate due-diligence assertions (zero-lookahead, point-in-time join integrity, adverse execution checks). | `uv run python examples/institutional_due_diligence_suite.py` |
-| **Orderbook Reconstruction** | Reconstructs synthetic L2 depth quotes from OHLCV bars and evaluates partial fills. | `uv run python examples/orderbook_reconstruction_example.py` |
-| **Universal Tick Stream** | Merges raw ticks, L2 orderbook quotes, and 1-hour OHLCV bars into a dynamic forward-filled tick stream. | `uv run python examples/universal_tick_stream_example.py` |
-| **Multi-Ticker / Timeframe Sweep** | Matrix evaluation across Gold, Silver, Crude Oil, BTC with IPC streaming. | `uv run python examples/multi_ticker_timeframe_suite.py` |
 
 ---
 

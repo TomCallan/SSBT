@@ -11,7 +11,10 @@ from ssbt.core.vectorised import VectorisedBacktester, VectorisedStrategy
 from ssbt.core.multi_engine import MultiSymbolEngine
 from ssbt.core._numba_kernels import HAS_NUMBA
 from ssbt.data.feed import InMemoryFeed, ParquetFeed
+from ssbt.data.live import LiveStreamFeed, QueueOverflowPolicy
 from ssbt.exceptions import SSBTError, DataError, ExecutionError, AuditError
+from ssbt.strategy.base import Strategy
+from ssbt.strategy.live_runner import LiveStrategyRunner
 from ssbt.execution import (
     QueuePriorityModel, ExecutionLatencyModel, L3MatchingEngine, QueueOrderTracker,
 )
@@ -47,7 +50,11 @@ from ssbt.data.point_in_time import align_multi_timeframe, validate_point_in_tim
 from ssbt.data.orderbook import rebuild_orderbook_from_bars, OrderBookEngine, OrderBookFeed, OrderBookQuote
 from ssbt.data.universal_tick import UniversalTickStream, UniversalTickFeed
 from ssbt.analytics.audit import AuditLogger, sync_latest_run_folder, AuditReport
-from ssbt.analytics.stream import ExecutionStreamPublisher, StreamEvent
+from ssbt.analytics.stream import (
+    ExecutionStreamPublisher, StreamEvent, StreamEventType,
+    IPCSink, BufferedFileSink, CallbackIPCSink, QueueIPCSink, SocketIPCSink,
+    RingBufferIPCSink, BinaryIPCSink,
+)
 from ssbt.analytics.robustness import (
     deflated_sharpe_ratio,
     probability_of_backtest_overfitting,
@@ -83,7 +90,7 @@ __all__ = [
     # Core Engine
     "Engine", "BacktestResult", "MultiSymbolEngine",
     "VectorisedBacktester", "VectorisedStrategy",
-    "ParquetFeed", "InMemoryFeed", "MatchingEngine", "Portfolio", "Strategy",
+    "ParquetFeed", "InMemoryFeed", "LiveStreamFeed", "QueueOverflowPolicy", "MatchingEngine", "Portfolio", "Strategy", "LiveStrategyRunner",
     "Bar", "BidAsk", "Order", "Fill", "Trade",
     "Side", "OrderType", "OrderStatus", "TimeInForce",
     "AllocationFn", "equal_weight", "inverse_volatility", "custom_allocation",
@@ -97,9 +104,11 @@ __all__ = [
     "run_experiment", "RunnerError",
     "Registry", "RegistryError",
     "BacktestAdapter",
-    # Audit, Overfitting Defense, Microstructure & Terminal Displays
+    # Audit, Overfitting Defense, Microstructure & IPC Streaming
     "AuditLogger", "AuditReport",
-    "ExecutionStreamPublisher", "StreamEvent",
+    "ExecutionStreamPublisher", "StreamEvent", "StreamEventType",
+    "IPCSink", "BufferedFileSink", "CallbackIPCSink", "QueueIPCSink", "SocketIPCSink",
+    "RingBufferIPCSink", "BinaryIPCSink",
     "deflated_sharpe_ratio", "probability_of_backtest_overfitting", "monte_carlo_trade_permutation",
     "ImpactModel", "LiquidityCapModel", "BorrowCostModel", "RealisticExecutionEngine",
     "VolatilityTargetingOverlay", "StrategyCapacityAnalyzer",

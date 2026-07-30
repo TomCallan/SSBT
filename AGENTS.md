@@ -44,24 +44,9 @@ M7 [X] 100% Hardening, Orderbook Engine, Partial Fills, Rerun Engine & Real-Time
 
 ## Testing Commands
 ```bash
-# Run full pytest suite (147 unit & integration tests)
+# Run full pytest suite (165 unit & integration tests)
 uv run python -m pytest ssbt/tests/ -v
-
-# Run synthetic L2 orderbook reconstruction example
-uv run python examples/orderbook_reconstruction_example.py
 
 # Run deterministic rerun CLI verifier
 uv run python -m ssbt.cli.rerun artifacts/inst_run_20260728_211537
-
-# Run institutional due-diligence verification suite
-uv run python examples/institutional_due_diligence_suite.py
-
-# Run multi-ticker & multi-timeframe prop matrix suite
-uv run python examples/multi_ticker_timeframe_suite.py
-
-# Run interactive Tkinter Desktop GUI
-uv run python gui_examples/desktop_gui.py
-
-# Run interactive Web Browser Dashboard GUI
-uv run python gui_examples/web_gui.py
 ```

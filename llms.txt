@@ -35,10 +35,10 @@ High-speed event-driven research platform for market hypothesis testing, event s
 - `capture_environment_snapshot()`: Captures Git commit SHA, branch, Python platform, random seeds, and config hash into `environment_snapshot.json`.
 - `python -m ssbt.cli.rerun <artifact_dir>`: CLI verifier for 100% deterministic rerun fidelity.
 
-### 6. `ssbt.analytics.stream` (Real-Time IPC Stream Publisher)
-- Class: `ExecutionStreamPublisher(log_path="artifacts/<run_id>/execution_stream.jsonl")`
-- Methods: `publish(event_type, timestamp, data)`, `subscribe(callback_fn)`
-- Events: `BAR`, `ORDER`, `FILL`, `TRADE`, `EQUITY` streamed to JSONL files or live subscriber callbacks for PySide/Tkinter/Web interfaces.
+### 6. `ssbt.analytics.stream` (Real-Time IPC Stream Engine)
+- Class: `ExecutionStreamPublisher(sinks=[...])`
+- Pluggable Sinks: `BufferedFileSink`, `SocketIPCSink`, `QueueIPCSink`, `CallbackIPCSink`.
+- Events: `BAR`, `ORDER_SUBMITTED`, `ORDER_FILLED`, `PARTIAL_FILL`, `TRADE`, `EQUITY_UPDATE` streamed to high-throughput buffered files, sockets, ring buffers, or callbacks.
 
 ### 7. `ssbt.analytics.audit` & `ssbt.analytics.terminal`
 - Audit Logger: `AuditLogger()` verifies causal timestamp ordering, anti-lookahead integrity (`verify_event_outcomes`, `verify_backtest`), and exports `audit_trail.json` and `simulation_assumptions_report.json`.

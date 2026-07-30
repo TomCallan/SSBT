@@ -36,8 +36,7 @@ Use this skill when interacting with the **SSBT (Super Speedy Backtesting Tool)*
    - Run `uv run python -m ssbt.cli.rerun <artifact_dir>` to verify 100% exact rerun fidelity.
 
 7. **Real-Time IPC Execution Stream**:
-   - Use `ssbt.analytics.stream.ExecutionStreamPublisher` to stream events to `artifacts/<run_id>/execution_stream.jsonl`.
-   - Attach subscriber callbacks to integrate with live PySide/Tkinter/Web GUIs (`gui_examples/desktop_gui.py` and `gui_examples/web_gui.py`).
+   - Use `ssbt.analytics.stream.ExecutionStreamPublisher` to stream events to high-performance buffered sinks, socket endpoints, or subscriber callbacks.
 
 8. **Integrity & Audit Trail Verification**:
    - Use `ssbt.analytics.audit.AuditLogger` to run anti-lookahead timestamp checks (`verify_event_outcomes`, `verify_backtest`).
@@ -45,24 +44,9 @@ Use this skill when interacting with the **SSBT (Super Speedy Backtesting Tool)*
 
 ## Testing Commands
 ```bash
-# Run complete test suite (147 unit & integration tests)
+# Run complete test suite (165 unit & integration tests)
 uv run python -m pytest ssbt/tests/ -v
-
-# Run synthetic L2 orderbook reconstruction example
-uv run python examples/orderbook_reconstruction_example.py
 
 # Run deterministic rerun CLI verifier
 uv run python -m ssbt.cli.rerun artifacts/inst_run_20260728_211537
-
-# Run institutional due-diligence verification suite
-uv run python examples/institutional_due_diligence_suite.py
-
-# Run multi-ticker & multi-timeframe prop matrix suite
-uv run python examples/multi_ticker_timeframe_suite.py
-
-# Run interactive Tkinter Desktop GUI
-uv run python gui_examples/desktop_gui.py
-
-# Run interactive Web Browser Dashboard GUI
-uv run python gui_examples/web_gui.py
 ```

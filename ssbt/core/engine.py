@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ssbt.core.events import Bar, BidAsk, Fill, Order
+from ssbt.core.events import Bar, BidAsk, Fill, Order, GenericTickEvent
 from ssbt.core.matching import MatchingEngine
 from ssbt.core.portfolio import Portfolio
 from ssbt.data.feed import InMemoryFeed, ParquetFeed
@@ -56,11 +56,13 @@ class Engine:
         strategy=None,
         initial_cash: float = 100_000.0,
         matching: MatchingEngine | None = None,
+        stream_publisher=None,
     ):
         self.feed = feed
         self.strategy = strategy
         self.matching = matching or MatchingEngine()
         self.portfolio = Portfolio(initial_cash=initial_cash)
+        self.stream_publisher = stream_publisher
         self._event_count = 0
         self._fast_path = False  # set in run() if InMemoryFeed single-symbol
 
@@ -103,6 +105,8 @@ class Engine:
             self._run_generic()
 
         self.strategy.on_finish(self)
+        if self.stream_publisher:
+            self.stream_publisher.flush()
 
         equity = self.portfolio.equity_curve
         return BacktestResult(
@@ -247,4 +251,28 @@ class Engine:
                         self.portfolio.apply_fill(fill)
 
                 mid = (event.bid + event.ask) / 2
+                self.portfolio.update_prices(event.symbol, mid, event.timestamp)
+
+            elif isinstance(event, GenericTickEvent):
+                ba = BidAsk(
+                    timestamp=event.timestamp,
+                    symbol=event.symbol,
+                    bid=event.bid if event.bid > 0 else event.price,
+                    ask=event.ask if event.ask > 0 else event.price,
+                )
+                fills = self.matching.process_bidask(ba)
+                for fill in fills:
+                    self.portfolio.apply_fill(fill)
+
+                if hasattr(self.strategy, "on_tick"):
+                    self.strategy.on_tick(event, self)
+                else:
+                    self.strategy.on_bidask(ba, self)
+
+                if self.matching.has_new:
+                    fills = self.matching.process_bidask(ba)
+                    for fill in fills:
+                        self.portfolio.apply_fill(fill)
+
+                mid = (ba.bid + ba.ask) / 2
                 self.portfolio.update_prices(event.symbol, mid, event.timestamp)
