@@ -2,7 +2,6 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code Style: Clean Text](https://img.shields.io/badge/code%20style-zero%20emojis-black.svg)](AGENTS.md)
 
 **SSBT** is an event-driven quantitative strategy exploration, backtesting, and institutional verification engine written in Python. It is designed for quantitative researchers, algorithmic traders, and strategy developers who require point-in-time anti-lookahead causality auditing, worst-case market microstructure execution realism, statistical overfitting defenses, and 100% deterministic rerun reproducibility.
 
@@ -308,9 +307,9 @@ artifacts/
 
 ---
 
-## Real-Time IPC Event Streaming
+## Real-Time IPC Event Streaming & Live Data Ingestion
 
-Stream real-time engine bar events, order submissions, fills, trades, and portfolio equity updates to high-throughput buffered file sinks, sockets, ring buffers, or custom callbacks:
+Stream engine bar events, order submissions, fills, trades, and portfolio equity updates in real-time to high-throughput buffered file sinks, sockets, ring buffers, or custom callbacks:
 
 ```python
 from ssbt import ExecutionStreamPublisher, BufferedFileSink, SocketIPCSink
@@ -320,6 +319,32 @@ publisher = ExecutionStreamPublisher(sinks=[
     BufferedFileSink("artifacts/latest/execution_stream.jsonl", batch_size=500),
     SocketIPCSink(host="127.0.0.1", port=9999)
 ])
+```
+
+SSBT supports real-time, live market data ingestion from external WebSocket listeners, REST API pollers, ZeroMQ streams, or gRPC connectors using `LiveStreamFeed`. External connectors push live bars, bid/ask quotes, or trade ticks directly into SSBT's real-time engine loop:
+
+```python
+from ssbt import Engine, LiveStreamFeed, QueueOverflowPolicy
+
+# 1. Initialize thread-safe live stream feed
+feed = LiveStreamFeed(
+    symbols="BTCUSD",
+    max_queue_size=100_000,
+    overflow_policy=QueueOverflowPolicy.DISCARD_OLDEST,
+)
+
+# 2. In your external WebSocket/REST client callback thread:
+def on_websocket_quote(data):
+    feed.push_bidask(
+        timestamp=data["timestamp"],
+        symbol=data["symbol"],
+        bid=data["bid"],
+        ask=data["ask"],
+    )
+
+# 3. Execute strategy against live incoming market events
+engine = Engine(feed=feed, strategy=my_live_strategy)
+result = engine.run()
 ```
 
 ---
@@ -374,12 +399,6 @@ from ssbt import (
     SSBTError, DataError, ExecutionError, AuditError,
 )
 ```
-
----
-
-## Code Style & Zero-Emoji Directive
-
-SSBT strictly enforces a clean text/markdown style across all codebase source files, terminal console logs, and documentation. No emojis are permitted anywhere in the repository.
 
 ---
 

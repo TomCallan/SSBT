@@ -19,8 +19,7 @@ M7 [X] 100% Hardening, Orderbook Engine, Partial Fills, Rerun Engine & Real-Time
 ```
 
 ## Key Architectural Principles & Controls
-1. Zero Emojis Rule: Strictly maintain clean text/markdown across all code, logs, and docs.
-2. Data Ingestion Philosophy: SSBT harnesses zero internal data downloading APIs; external data is supplied as Polars DataFrames into `InMemoryFeed`.
+1. Data Ingestion Philosophy: SSBT harnesses zero internal data downloading APIs; external data is supplied as Polars DataFrames into `InMemoryFeed` or pushed live into `LiveStreamFeed`.
 3. Worst-Case Adverse Execution: Pending orders match in conservative order ("fills against position then for"), evaluating stop-loss orders prior to profit target fills.
 4. Orderbook Engine & Partial Fills: Reconstruct synthetic L2 depth quotes (`rebuild_orderbook_from_bars`) and support `OrderStatus.PARTIALLY_FILLED`.
 5. Anti-Lookahead Causality & Point-In-Time Integrity: Validate timestamp causality using `AuditLogger`, `align_multi_timeframe()`, and emit SHA-256 integrity signatures and `simulation_assumptions_report.json`.
