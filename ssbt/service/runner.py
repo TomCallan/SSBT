@@ -22,6 +22,7 @@ from ssbt.service.errors import (
     E_STRATEGY_INIT,
     ServiceError,
 )
+from ssbt.service.observability import StageTimer, TraceLogger
 from ssbt.service.schemas import (
     BacktestRequest,
     BacktestResponse,
@@ -136,220 +137,245 @@ def _instantiate_strategy(spec: StrategySpec) -> ssbt.Strategy:
 
 def run_backtest(request: BacktestRequest) -> BacktestResponse:
     """Execute synchronous backtest service workflow."""
-    run_id = request.run_id or f"run_{uuid.uuid4().hex[:12]}"
-    config_hash = _compute_config_hash(request)
+    with StageTimer() as total_timer:
+        run_id = request.run_id or f"run_{uuid.uuid4().hex[:12]}"
+        config_hash = _compute_config_hash(request)
+        logger = TraceLogger(run_id=run_id)
+        logger.log("info", "backtest_start", config_hash=config_hash)
 
-    # 1. Validate data input
-    if request.data.dataframe is None and request.data.parquet_path is None:
-        return BacktestResponse(
-            status="failed",
-            run_id=run_id,
-            config_hash=config_hash,
-            error=ServiceError(
-                code=E_DATA_SCHEMA,
-                message="Data source missing: neither dataframe nor parquet_path provided",
-                hint="Provide a valid Polars/Pandas DataFrame or parquet_path in DataSpec",
-            ).to_spec(),
-        )
-
-    df: pl.DataFrame | None = None
-    if request.data.parquet_path is not None:
-        p_path = Path(request.data.parquet_path)
-        if not p_path.exists():
-            return BacktestResponse(
-                status="failed",
-                run_id=run_id,
-                config_hash=config_hash,
-                error=ServiceError(
-                    code=E_DATA_SCHEMA,
-                    message=f"Parquet file not found: {p_path}",
-                    hint="Ensure parquet_path points to an existing file",
-                ).to_spec(),
-            )
-        try:
-            df = pl.read_parquet(p_path)
-        except Exception as e:
-            return BacktestResponse(
-                status="failed",
-                run_id=run_id,
-                config_hash=config_hash,
-                error=ServiceError(
-                    code=E_DATA_SCHEMA,
-                    message=f"Failed to read Parquet file: {e}",
-                    hint="Check file integrity and format",
-                    details={"error": str(e)},
-                ).to_spec(),
-            )
-    elif request.data.dataframe is not None:
-        raw_df = request.data.dataframe
-        try:
-            if isinstance(raw_df, pl.DataFrame):
-                df = raw_df
-            elif type(raw_df).__module__.startswith("pandas"):
-                df = pl.from_pandas(raw_df)
-            elif isinstance(raw_df, dict):
-                df = pl.DataFrame(raw_df)
-            elif hasattr(raw_df, "to_polars"):
-                df = raw_df.to_polars()
-            else:
+        # 1. Validate data input
+        with StageTimer() as data_prep_timer:
+            if request.data.dataframe is None and request.data.parquet_path is None:
                 return BacktestResponse(
                     status="failed",
                     run_id=run_id,
                     config_hash=config_hash,
                     error=ServiceError(
                         code=E_DATA_SCHEMA,
-                        message=f"Unsupported dataframe type: {type(raw_df)}",
-                        hint="Pass a Polars DataFrame, Pandas DataFrame, or dict",
+                        message="Data source missing: neither dataframe nor parquet_path provided",
+                        hint="Provide a valid Polars/Pandas DataFrame or parquet_path in DataSpec",
                     ).to_spec(),
                 )
-        except Exception as e:
-            return BacktestResponse(
-                status="failed",
-                run_id=run_id,
-                config_hash=config_hash,
-                error=ServiceError(
-                    code=E_DATA_SCHEMA,
-                    message=f"Failed to convert dataframe to Polars: {e}",
-                    hint="Check dataframe content and structure",
-                    details={"error": str(e)},
-                ).to_spec(),
-            )
 
-    if df is None or df.is_empty():
-        return BacktestResponse(
-            status="failed",
+            df: pl.DataFrame | None = None
+            if request.data.parquet_path is not None:
+                p_path = Path(request.data.parquet_path)
+                if not p_path.exists():
+                    return BacktestResponse(
+                        status="failed",
+                        run_id=run_id,
+                        config_hash=config_hash,
+                        error=ServiceError(
+                            code=E_DATA_SCHEMA,
+                            message=f"Parquet file not found: {p_path}",
+                            hint="Ensure parquet_path points to an existing file",
+                        ).to_spec(),
+                    )
+                try:
+                    df = pl.read_parquet(p_path)
+                except Exception as e:
+                    return BacktestResponse(
+                        status="failed",
+                        run_id=run_id,
+                        config_hash=config_hash,
+                        error=ServiceError(
+                            code=E_DATA_SCHEMA,
+                            message=f"Failed to read Parquet file: {e}",
+                            hint="Check file integrity and format",
+                            details={"error": str(e)},
+                        ).to_spec(),
+                    )
+            elif request.data.dataframe is not None:
+                raw_df = request.data.dataframe
+                try:
+                    if isinstance(raw_df, pl.DataFrame):
+                        df = raw_df
+                    elif type(raw_df).__module__.startswith("pandas"):
+                        df = pl.from_pandas(raw_df)
+                    elif isinstance(raw_df, dict):
+                        df = pl.DataFrame(raw_df)
+                    elif hasattr(raw_df, "to_polars"):
+                        df = raw_df.to_polars()
+                    else:
+                        return BacktestResponse(
+                            status="failed",
+                            run_id=run_id,
+                            config_hash=config_hash,
+                            error=ServiceError(
+                                code=E_DATA_SCHEMA,
+                                message=f"Unsupported dataframe type: {type(raw_df)}",
+                                hint="Pass a Polars DataFrame, Pandas DataFrame, or dict",
+                            ).to_spec(),
+                        )
+                except Exception as e:
+                    return BacktestResponse(
+                        status="failed",
+                        run_id=run_id,
+                        config_hash=config_hash,
+                        error=ServiceError(
+                            code=E_DATA_SCHEMA,
+                            message=f"Failed to convert dataframe to Polars: {e}",
+                            hint="Check dataframe content and structure",
+                            details={"error": str(e)},
+                        ).to_spec(),
+                    )
+
+            if df is None or df.is_empty():
+                return BacktestResponse(
+                    status="failed",
+                    run_id=run_id,
+                    config_hash=config_hash,
+                    error=ServiceError(
+                        code=E_DATA_SCHEMA,
+                        message="Provided data is empty (0 rows)",
+                        hint="Provide a dataset containing at least 1 row of market data",
+                    ).to_spec(),
+                )
+
+            # Convert timestamp column to int epoch milliseconds if datetime/date
+            if "timestamp" in df.columns:
+                dtype = df["timestamp"].dtype
+                if isinstance(dtype, (pl.Datetime, pl.Date)) or dtype in (pl.Datetime, pl.Date):
+                    df = df.with_columns(pl.col("timestamp").dt.epoch("ms"))
+
+            symbol = request.data.symbol or "ASSET"
+            try:
+                feed = InMemoryFeed(df, symbol=symbol)
+            except Exception as e:
+                return BacktestResponse(
+                    status="failed",
+                    run_id=run_id,
+                    config_hash=config_hash,
+                    error=ServiceError(
+                        code=E_DATA_SCHEMA,
+                        message=f"Invalid market data schema: {e}",
+                        hint="Ensure DataFrame contains timestamp, open, high, low, close, volume (or timestamp, bid, ask)",
+                        details={"error": str(e)},
+                    ).to_spec(),
+                )
+        data_prep_ms = data_prep_timer.elapsed_ms()
+
+        # 2. Enforce limits
+        if request.limits and request.limits.max_bars > 0:
+            if feed.n_bars > request.limits.max_bars:
+                return BacktestResponse(
+                    status="failed",
+                    run_id=run_id,
+                    config_hash=config_hash,
+                    error=ServiceError(
+                        code=E_RESOURCE_LIMIT,
+                        message=f"Dataset bar count ({feed.n_bars}) exceeds max_bars limit ({request.limits.max_bars})",
+                        hint="Increase ResourceLimitSpec.max_bars or truncate input data",
+                        details={"n_bars": feed.n_bars, "max_bars": request.limits.max_bars},
+                    ).to_spec(),
+                )
+
+        # 3. Strategy setup
+        with StageTimer() as strategy_init_timer:
+            try:
+                strat = _instantiate_strategy(request.strategy)
+            except ServiceError as se:
+                return BacktestResponse(
+                    status="failed",
+                    run_id=run_id,
+                    config_hash=config_hash,
+                    error=se.to_spec(),
+                )
+            except Exception as e:
+                return BacktestResponse(
+                    status="failed",
+                    run_id=run_id,
+                    config_hash=config_hash,
+                    error=ServiceError(
+                        code=E_STRATEGY_INIT,
+                        message=f"Strategy initialization failed: {e}",
+                        hint="Verify strategy syntax and instantiation kwargs",
+                        details={"error": str(e)},
+                    ).to_spec(),
+                )
+        strategy_init_ms = strategy_init_timer.elapsed_ms()
+
+        # 4. Execute engine run
+        with StageTimer() as engine_run_timer:
+            try:
+                engine = Engine(
+                    feed=feed,
+                    strategy=strat,
+                    initial_cash=request.execution.initial_cash,
+                )
+                res = engine.run()
+            except Exception as e:
+                return BacktestResponse(
+                    status="failed",
+                    run_id=run_id,
+                    config_hash=config_hash,
+                    error=ServiceError(
+                        code=E_STRATEGY_INIT,
+                        message=f"Backtest engine execution error: {e}",
+                        hint="Check strategy runtime logic in on_bar/on_bidask",
+                        details={"error": str(e)},
+                    ).to_spec(),
+                )
+        engine_run_ms = engine_run_timer.elapsed_ms()
+
+        # 5. Compute metrics
+        with StageTimer() as metrics_timer:
+            metrics = compute_metrics(res.equity_curve, res.trades)
+        metrics_ms = metrics_timer.elapsed_ms()
+
+        # 6. Artifact creation
+        artifact_dir = Path("artifacts") / run_id
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+
+        request_file = artifact_dir / "request.json"
+        request_file.write_text(request.to_json(indent=2), encoding="utf-8")
+
+        artifacts_map: dict[str, str] = {
+            "request": str(request_file),
+        }
+
+        try:
+            from ssbt.experiments.reproducibility import capture_environment_snapshot
+
+            snap_path = artifact_dir / "environment_snapshot.json"
+            snapshot = capture_environment_snapshot(config=request.to_dict())
+            snap_path.write_text(json.dumps(snapshot, indent=2, default=str), encoding="utf-8")
+            artifacts_map["environment_snapshot"] = str(snap_path)
+        except Exception:
+            pass
+
+        total_ms = total_timer.elapsed_ms()
+        timing_ms = {
+            "data_prep_ms": data_prep_ms,
+            "strategy_init_ms": strategy_init_ms,
+            "engine_run_ms": engine_run_ms,
+            "metrics_ms": metrics_ms,
+            "total_ms": total_ms,
+        }
+        logger.log("info", "backtest_complete", timing_ms=timing_ms)
+
+        response = BacktestResponse(
+            status="success",
             run_id=run_id,
             config_hash=config_hash,
-            error=ServiceError(
-                code=E_DATA_SCHEMA,
-                message="Provided data is empty (0 rows)",
-                hint="Provide a dataset containing at least 1 row of market data",
-            ).to_spec(),
+            summary=metrics,
+            equity_curve=res.equity_curve.tolist() if len(res.equity_curve) > 0 else [],
+            fills=[_object_to_dict(f) for f in res.fills],
+            trades=[_object_to_dict(t) for t in res.trades],
+            audit={
+                "n_events": res.n_events,
+                "symbol": symbol,
+                "timing_ms": timing_ms,
+            },
+            artifacts=artifacts_map,
+            error=None,
         )
 
-    # Convert timestamp column to int epoch milliseconds if datetime/date
-    if "timestamp" in df.columns:
-        dtype = df["timestamp"].dtype
-        if isinstance(dtype, (pl.Datetime, pl.Date)) or dtype in (pl.Datetime, pl.Date):
-            df = df.with_columns(pl.col("timestamp").dt.epoch("ms"))
+        response_file = artifact_dir / "response.json"
+        response_file.write_text(response.to_json(indent=2), encoding="utf-8")
+        response.artifacts["response"] = str(response_file)
 
-    symbol = request.data.symbol or "ASSET"
-    try:
-        feed = InMemoryFeed(df, symbol=symbol)
-    except Exception as e:
-        return BacktestResponse(
-            status="failed",
-            run_id=run_id,
-            config_hash=config_hash,
-            error=ServiceError(
-                code=E_DATA_SCHEMA,
-                message=f"Invalid market data schema: {e}",
-                hint="Ensure DataFrame contains timestamp, open, high, low, close, volume (or timestamp, bid, ask)",
-                details={"error": str(e)},
-            ).to_spec(),
-        )
-
-    # 2. Enforce limits
-    if request.limits and request.limits.max_bars > 0:
-        if feed.n_bars > request.limits.max_bars:
-            return BacktestResponse(
-                status="failed",
-                run_id=run_id,
-                config_hash=config_hash,
-                error=ServiceError(
-                    code=E_RESOURCE_LIMIT,
-                    message=f"Dataset bar count ({feed.n_bars}) exceeds max_bars limit ({request.limits.max_bars})",
-                    hint="Increase ResourceLimitSpec.max_bars or truncate input data",
-                    details={"n_bars": feed.n_bars, "max_bars": request.limits.max_bars},
-                ).to_spec(),
-            )
-
-    # 3. Strategy setup
-    try:
-        strat = _instantiate_strategy(request.strategy)
-    except ServiceError as se:
-        return BacktestResponse(
-            status="failed",
-            run_id=run_id,
-            config_hash=config_hash,
-            error=se.to_spec(),
-        )
-    except Exception as e:
-        return BacktestResponse(
-            status="failed",
-            run_id=run_id,
-            config_hash=config_hash,
-            error=ServiceError(
-                code=E_STRATEGY_INIT,
-                message=f"Strategy initialization failed: {e}",
-                hint="Verify strategy syntax and instantiation kwargs",
-                details={"error": str(e)},
-            ).to_spec(),
-        )
-
-    # 4. Execute engine run
-    try:
-        engine = Engine(
-            feed=feed,
-            strategy=strat,
-            initial_cash=request.execution.initial_cash,
-        )
-        res = engine.run()
-    except Exception as e:
-        return BacktestResponse(
-            status="failed",
-            run_id=run_id,
-            config_hash=config_hash,
-            error=ServiceError(
-                code=E_STRATEGY_INIT,
-                message=f"Backtest engine execution error: {e}",
-                hint="Check strategy runtime logic in on_bar/on_bidask",
-                details={"error": str(e)},
-            ).to_spec(),
-        )
-
-    # 5. Compute metrics
-    metrics = compute_metrics(res.equity_curve, res.trades)
-
-    # 6. Artifact creation
-    artifact_dir = Path("artifacts") / run_id
-    artifact_dir.mkdir(parents=True, exist_ok=True)
-
-    request_file = artifact_dir / "request.json"
-    request_file.write_text(request.to_json(indent=2), encoding="utf-8")
-
-    artifacts_map: dict[str, str] = {
-        "request": str(request_file),
-    }
-
-    try:
-        from ssbt.experiments.reproducibility import capture_environment_snapshot
-
-        snap_path = artifact_dir / "environment_snapshot.json"
-        snapshot = capture_environment_snapshot(config=request.to_dict())
-        snap_path.write_text(json.dumps(snapshot, indent=2, default=str), encoding="utf-8")
-        artifacts_map["environment_snapshot"] = str(snap_path)
-    except Exception:
-        pass
-
-    response = BacktestResponse(
-        status="success",
-        run_id=run_id,
-        config_hash=config_hash,
-        summary=metrics,
-        equity_curve=res.equity_curve.tolist() if len(res.equity_curve) > 0 else [],
-        fills=[_object_to_dict(f) for f in res.fills],
-        trades=[_object_to_dict(t) for t in res.trades],
-        audit={"n_events": res.n_events, "symbol": symbol},
-        artifacts=artifacts_map,
-        error=None,
-    )
-
-    response_file = artifact_dir / "response.json"
-    response_file.write_text(response.to_json(indent=2), encoding="utf-8")
-    response.artifacts["response"] = str(response_file)
-
-    return response
+        return response
 
 
 async def run_backtest_async(request: BacktestRequest) -> BacktestResponse:

@@ -17,6 +17,7 @@ from ssbt.service.jobs import (
     start_job,
     subscribe_job_stream,
 )
+from ssbt.service.observability import StageTimer, TraceLogger
 from ssbt.service.rerun import compare, rerun
 from ssbt.service.runner import _compute_config_hash, run_backtest, run_backtest_async
 from ssbt.service.schemas import (
@@ -56,6 +57,6 @@ __all__ = [
     "subscribe_job_stream",
     "explain_failure",
     "get_agent_tool_spec",
+    "TraceLogger",
+    "StageTimer",
 ]
-
-
