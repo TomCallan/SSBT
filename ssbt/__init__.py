@@ -112,6 +112,13 @@ from ssbt.service import (
     E_RESOURCE_LIMIT,
     E_LOOKAHEAD,
     E_RUN_NOT_FOUND,
+    JobManager,
+    JobStatus,
+    JobInfo,
+    start_job,
+    get_job_status,
+    cancel_job,
+    subscribe_job_stream,
     explain_failure,
     get_agent_tool_spec,
     TraceLogger,
@@ -151,11 +158,12 @@ __all__ = [
     "VolatilityTargetingOverlay", "StrategyCapacityAnalyzer",
     "generate_all_charts", "generate_matrix_heatmap_chart", "generate_multi_equity_curve_chart",
     "display_experiment_summary", "display_backtest_summary", "display_audit_status",
-    # Engine Service Core
+    # Engine Service Core & Job Streaming
     "run_backtest", "run_backtest_async", "rerun", "compare",
     "BacktestRequest", "BacktestResponse", "StrategySpec", "DataSpec",
     "ExecutionSpec", "ResourceLimitSpec", "ServiceError",
     "E_DATA_SCHEMA", "E_STRATEGY_INIT", "E_RESOURCE_LIMIT", "E_LOOKAHEAD", "E_RUN_NOT_FOUND",
+    "JobManager", "JobStatus", "JobInfo", "start_job", "get_job_status", "cancel_job", "subscribe_job_stream",
     "explain_failure", "get_agent_tool_spec", "TraceLogger", "StageTimer",
 ]
 
