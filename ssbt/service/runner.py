@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import uuid
@@ -349,3 +350,10 @@ def run_backtest(request: BacktestRequest) -> BacktestResponse:
     response.artifacts["response"] = str(response_file)
 
     return response
+
+
+async def run_backtest_async(request: BacktestRequest) -> BacktestResponse:
+    """Execute asynchronous backtest service workflow in an executor thread."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, run_backtest, request)
+

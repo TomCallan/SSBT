@@ -7,7 +7,8 @@ from ssbt.service.errors import (
     ErrorSpec,
     ServiceError,
 )
-from ssbt.service.runner import _compute_config_hash, run_backtest
+from ssbt.service.rerun import compare, rerun
+from ssbt.service.runner import _compute_config_hash, run_backtest, run_backtest_async
 from ssbt.service.schemas import (
     BacktestRequest,
     BacktestResponse,
@@ -33,4 +34,7 @@ __all__ = [
     "BacktestResponse",
     "_compute_config_hash",
     "run_backtest",
+    "run_backtest_async",
+    "rerun",
+    "compare",
 ]
