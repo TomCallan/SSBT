@@ -1,127 +1,170 @@
-# SSBT: Quantitative Strategy Exploration Engine & Backtester
+# SSBT Documentation
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+SSBT is an event-driven quantitative strategy exploration, backtesting, and institutional verification engine written in Python.
 
-**SSBT** is an event-driven quantitative strategy exploration, backtesting, and institutional verification engine written in Python. It is designed for quantitative researchers, algorithmic traders, and strategy developers who require point-in-time anti-lookahead causality auditing, worst-case market microstructure execution realism, statistical overfitting defenses, and 100% deterministic rerun reproducibility.
+This README is the central documentation index for users, researchers, and integrators.
 
----
+## Table of Contents
 
-## Technical Features & Architectural Controls
-
-- **Universal Dynamic Tick Stream**: Merges L1 Raw Trade Ticks, L2/L3 Orderbook depth quotes, and OHLCV bars of any resolution (1d, 4h, 1h, 15m, 5m, 1m) into a unified, forward-filled tick stream (`UniversalTickStream`).
-- **Worst-Case Adverse Execution Model**: Evaluates pending limit, stop, and trailing stop orders in adverse fill sequence ("fills against position then for"), prioritizing stop-loss evaluation prior to profit targets on same-bar triggers.
-- **Microstructure Realism**: Reconstructs synthetic L2 depth quotes (`rebuild_orderbook_from_bars`), supports partial fills (`OrderStatus.PARTIALLY_FILLED`), ADV market impact (`ImpactModel`), volume participation caps (`LiquidityCapModel`), and short borrow cost financing (`BorrowCostModel`).
-- **Statistical Overfitting Defense Suite**: Calculates Deflated Sharpe Ratio (`deflated_sharpe_ratio`), Probability of Backtest Overfitting (`probability_of_backtest_overfitting`), and 1,000-iteration Monte Carlo trade sequence permutations.
-- **Anti-Lookahead Causality Audit**: `AuditLogger` verifies timestamp causality, validates point-in-time joins (`align_multi_timeframe`), and emits SHA-256 integrity signatures alongside `simulation_assumptions_report.json`.
-- **Immutable Reproducibility & Rerun Verification**: Captures environment snapshots (`environment_snapshot.json`) and verifies 100% deterministic rerun fidelity via `uv run python -m ssbt.cli.rerun <run_id>`.
-- **Universal 1-Line Plotting API**: Instant rendering of multi-asset equity curves, underwater drawdowns, trade PnLs, and statistical robustness audits via `ssbt.plot()` and `@ssbt.autoplot`.
-- **Real-Time IPC Streaming**: Emits live `BAR`, `ORDER`, `FILL`, `TRADE`, and `EQUITY` events via `ExecutionStreamPublisher` over sockets or JSONL logs for Tkinter Desktop & Web Dashboard GUIs.
-- **High-Throughput Performance**: Leverages Polars Apache Arrow memory and pre-allocated Numba bar loops for backtesting execution throughput exceeding 1,000,000 bars/second.
-
----
-
-## Architectural Data Flow
-
-```
-[ External Market Data ] ---> [ Polars DataFrame ]
-                                     |
-                                     v
-                       [ UniversalTickStream ] (Forward-Filling)
-                                     |
-                                     v
-                           [ Engine Core ] <---> [ Strategy ]
-                                     |
-                          (Adverse Priority Matching)
-                                     |
-                                     v
-             +-----------------------+-----------------------+
-             |                       |                       |
-             v                       v                       v
-    [ AuditLogger ]        [ Overfitting Suite ]   [ ExecutionStreamPublisher ]
-   (Point-in-Time Join)    (DSR / PBO / Monte Carlo) (Real-Time IPC Streaming)
-             |                       |                       |
-             v                       v                       v
-   [ audit_trail.json ]    [ robustness_audit.png ]   [ Desktop / Web GUI ]
-```
+- [1. Project Overview](#1-project-overview)
+- [2. Scope and Status](#2-scope-and-status)
+- [3. Installation](#3-installation)
+- [4. Quickstart](#4-quickstart)
+- [5. Core Concepts](#5-core-concepts)
+- [6. Data Ingestion](#6-data-ingestion)
+- [7. Strategy API](#7-strategy-api)
+- [8. Backtesting Workflow](#8-backtesting-workflow)
+- [9. Execution and Microstructure Realism](#9-execution-and-microstructure-realism)
+- [10. Anti-Lookahead and Point-in-Time Integrity](#10-anti-lookahead-and-point-in-time-integrity)
+- [11. Overfitting Defense and Statistical Validation](#11-overfitting-defense-and-statistical-validation)
+- [12. Reproducibility and Deterministic Reruns](#12-reproducibility-and-deterministic-reruns)
+- [13. Real-Time Streaming and IPC](#13-real-time-streaming-and-ipc)
+- [14. Visualization and Reporting](#14-visualization-and-reporting)
+- [15. Artifacts and Output Structure](#15-artifacts-and-output-structure)
+- [16. Performance Characteristics](#16-performance-characteristics)
+- [17. CLI Commands](#17-cli-commands)
+- [18. Public API Reference](#18-public-api-reference)
+- [19. Testing and Verification](#19-testing-and-verification)
+- [20. Design Constraints and Guarantees](#20-design-constraints-and-guarantees)
+- [21. FAQ](#21-faq)
+- [22. Contribution Notes](#22-contribution-notes)
+- [23. License and Disclaimer](#23-license-and-disclaimer)
 
 ---
 
-## Installation & Environment Setup
+## 1. Project Overview
 
-SSBT requires Python 3.10+ and uses `uv` for fast dependency resolution.
+SSBT is designed for quantitative research and production-grade strategy validation. It provides:
+
+- Event-driven simulation and backtesting
+- Realistic execution controls (including partial fills and adverse sequencing)
+- Overfitting defense metrics (DSR and PBO)
+- Causality auditing for anti-lookahead protection
+- Immutable rerun workflows for reproducibility
+- Real-time event streaming for GUI and external systems
+
+---
+
+## 2. Scope and Status
+
+Current delivery status:
+
+- M0-M7 complete
+- Institutional quant hardening complete
+- Quant due-diligence checklist complete
+
+Current project policy:
+
+- Feature scope is frozen
+- Future work is constrained to:
+  - UX refinement
+  - API ergonomics
+  - Documentation clarity
+  - Error handling
+  - Performance tuning
+  - User value alignment
+
+---
+
+## 3. Installation
+
+SSBT requires Python 3.10+.
 
 ```bash
-# Clone the repository
 git clone https://github.com/TomCallan/SSBT.git
 cd SSBT
-
-# Install dependencies via uv
 uv sync
 ```
 
 ---
 
-## ⚡ 1-Line Quickstart for Humans (Instant Prototyping)
-
-For rapid strategy exploration, SSBT provides top-level ergonomic helpers and synthetic data generation:
+## 4. Quickstart
 
 ```python
 import ssbt
 
-# 1. Generate realistic synthetic market bars in 1 line
 data = ssbt.generate_synthetic_bars(n_bars=1000, seed=42)
 
-# 2. Write strategy logic as a simple decorator or class
 @ssbt.strategy
 def momentum_strategy(bar, engine):
     if bar.close > bar.open:
-        engine.submit_order(ssbt.Strategy.market_order(bar.symbol, ssbt.Side.BUY, 1.0))
+        engine.submit_order(
+            ssbt.Strategy.market_order(bar.symbol, ssbt.Side.BUY, 1.0)
+        )
 
-# 3. Run backtest and view rich metrics in 1 line
 result = ssbt.quick_backtest(momentum_strategy, data, symbol="BTC-USD", verbose=True)
 
-# Access performance statistics directly
-print(f"Total Return: {result.total_return:.2%}, Sharpe Ratio: {result.sharpe_ratio:.2f}")
+print(f"Total Return: {result.total_return:.2%}")
+print(f"Sharpe Ratio: {result.sharpe_ratio:.2f}")
 ```
 
 ---
 
-## 🤖 AI Agent & Automation Tooling
+## 5. Core Concepts
 
-SSBT includes built-in tools for AI coding agents and programmatic pipelines:
+SSBT is built around the following principles:
 
-- **JSON Schema Emission**: Inspect experiment specification requirements programmatically:
-  ```bash
-  uv run python -m ssbt schema --out schema.json
-  ```
-- **Static Strategy Validation**: Validate Python strategy AST for syntax errors, missing methods, or lookahead operations:
-  ```bash
-  uv run python -m ssbt validate my_strategy.py
-  ```
-- **Machine-Readable Experiment Runs**: Execute experiments with structured JSON output:
-  ```bash
-  uv run python -m ssbt run experiment.yaml --json
-  ```
-- **Code Templates**: Get standard canonical strategy templates directly from Python or CLI:
-  ```python
-  import ssbt
-  template_code = ssbt.get_agent_template("sma_cross")
-  ```
+1. External data ownership: no internal market data downloading API.
+2. Causality-first simulation: strict point-in-time and timestamp validity.
+3. Conservative execution realism: adverse sequencing and partial fill support.
+4. Statistical robustness: overfitting diagnostics are first-class outputs.
+5. Reproducibility: deterministic reruns with environment snapshots.
 
 ---
 
-## Standard Backtesting Setup
+## 6. Data Ingestion
 
-Here is a complete, minimal example running a moving-average crossover strategy over Polars market data:
+All market data is user-supplied as Polars DataFrames.
+
+Primary feeds:
+
+- `InMemoryFeed`
+- `ParquetFeed`
+- `LiveStreamFeed`
+- `UniversalTickFeed`
+
+Required bar schema:
+
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `timestamp` | `Int64` | Unix epoch in ms or ns, monotonic |
+| `symbol` | `Utf8` | Asset symbol |
+| `open` | `Float64` | Open price |
+| `high` | `Float64` | High price |
+| `low` | `Float64` | Low price |
+| `close` | `Float64` | Close price |
+| `volume` | `Float64` | Bar volume |
+
+---
+
+## 7. Strategy API
+
+Strategies inherit `Strategy` and implement `on_bar(bar, engine)`.
+
+```python
+from ssbt import Strategy, Side, Bar
+
+class MyStrategy(Strategy):
+    def on_bar(self, bar: Bar, engine) -> None:
+        if self.is_flat(engine, bar.symbol):
+            engine.submit_order(self.market_order(bar.symbol, Side.BUY, qty=1.0))
+```
+
+Position helpers:
+
+- `self.is_flat(engine, symbol)`
+- `self.get_position_qty(engine, symbol)`
+
+---
+
+## 8. Backtesting Workflow
 
 ```python
 import polars as pl
 from ssbt import Strategy, Side, Bar, InMemoryFeed, BacktestAdapter, plot
 
-# 1. Define Strategy Logic
 class MovingAverageCross(Strategy):
-    def __init__(self, fast: int = 10, slow: int = 30):
+    def __init__(self, fast=10, slow=30):
         super().__init__()
         self.fast = fast
         self.slow = slow
@@ -131,16 +174,13 @@ class MovingAverageCross(Strategy):
         self.closes.append(bar.close)
         if len(self.closes) < self.slow:
             return
-
         fast_ma = sum(self.closes[-self.fast:]) / self.fast
         slow_ma = sum(self.closes[-self.slow:]) / self.slow
-
         if fast_ma > slow_ma and self.is_flat(engine, bar.symbol):
             engine.submit_order(self.market_order(bar.symbol, Side.BUY, qty=1.0))
         elif fast_ma < slow_ma and not self.is_flat(engine, bar.symbol):
             engine.submit_order(self.market_order(bar.symbol, Side.SELL, qty=1.0))
 
-# 2. Supply External Polars DataFrame
 df = pl.DataFrame({
     "timestamp": [1000, 2000, 3000, 4000, 5000],
     "symbol": ["BTC"] * 5,
@@ -151,110 +191,77 @@ df = pl.DataFrame({
     "volume": [10.0, 15.0, 12.0, 18.0, 20.0],
 })
 
-# 3. Execute Backtest
 feed = InMemoryFeed(df, symbol="BTC")
 adapter = BacktestAdapter(initial_cash=10000.0)
 result = adapter.run_backtest(feed, MovingAverageCross())
 
-# 4. Plot Performance Dashboard (Saved to artifacts/latest/strategy_dashboard.png)
 plot(result, title="Moving Average Cross Performance")
 ```
 
 ---
 
-## Strategy API & Position Helpers
+## 9. Execution and Microstructure Realism
 
-Inherit from `ssbt.Strategy` and override `on_bar(bar, engine)`:
+SSBT supports realistic trade modeling through:
 
-```python
-from ssbt import Strategy, Side, Order, OrderType, OrderStatus, Bar
+- Worst-case adverse order evaluation
+- Partial fills (`OrderStatus.PARTIALLY_FILLED`)
+- Orderbook reconstruction (`rebuild_orderbook_from_bars`)
+- Impact modeling (`ImpactModel`)
+- Liquidity caps (`LiquidityCapModel`)
+- Borrow costs (`BorrowCostModel`)
+- Realistic execution engine (`RealisticExecutionEngine`)
 
-class MyStrategy(Strategy):
-    def on_bar(self, bar: Bar, engine) -> None:
-        # Check current position status
-        if self.is_flat(engine, bar.symbol):
-            qty = self.get_position_qty(engine, bar.symbol)
-            
-            # Submit market order
-            engine.submit_order(self.market_order(bar.symbol, Side.BUY, qty=1.0))
-            
-            # Submit trailing stop order
-            engine.submit_order(Order(
-                id=0, symbol=bar.symbol, side=Side.SELL, type=OrderType.TRAILING_STOP,
-                qty=1.0, trail_offset=5.0, status=OrderStatus.PENDING
-            ))
-```
+Adverse sequencing rule:
+
+- Orders are evaluated in conservative priority: fills against the current position before favorable fills, with stop-loss checks prioritized over profit-taking.
 
 ---
 
-## Data Model & External Data Ingestion Philosophy
+## 10. Anti-Lookahead and Point-in-Time Integrity
 
-SSBT embraces zero internal data downloading APIs. All market data is passed into the engine as Polars DataFrames using `InMemoryFeed` or `ParquetFeed`.
+Key tools:
 
-### Schema Requirement
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `timestamp` | `Int64` | Unix Epoch timestamp (milliseconds or nanoseconds, strictly monotonic) |
-| `symbol` | `Utf8` | Asset ticker symbol |
-| `open` | `Float64` | Bar open price |
-| `high` | `Float64` | Bar high price |
-| `low` | `Float64` | Bar low price |
-| `close` | `Float64` | Bar close price |
-| `volume` | `Float64` | Bar volume |
+- `AuditLogger`
+- `align_multi_timeframe`
+- `validate_point_in_time_join`
 
----
-
-## Universal Tick Stream Engine (`UniversalTickStream`)
-
-Unify raw ticks, L2/L3 orderbook depth quotes, and multi-timeframe OHLCV bars into a single, chronologically sorted, forward-filled tick stream:
+Example:
 
 ```python
-from ssbt.data.universal_tick import UniversalTickStream, UniversalTickFeed
-from ssbt import MatchingEngine
+from ssbt import AuditLogger
 
-# Merge Raw Ticks, L2 Depth Quotes, and 1-Hour OHLCV Bars
-stream_ticks = UniversalTickStream.build_stream(
-    data_sources=[data_ticks, data_l2_quotes, data_1h_bars],
-    symbol="GC=F",
-    spread_pct=0.0002,
-    forward_fill=True,  # Forward-fills bid/ask/mid state across interval gaps
+logger = AuditLogger(verbose=False)
+report = logger.generate_report(
+    backtest_result=result["raw_result"],
+    output_dir="artifacts/run_01"
 )
 
-feed = UniversalTickFeed(stream_ticks)
-matching = MatchingEngine()
-
-while feed.has_next():
-    tick = feed.next_tick()
-    fills = matching.process_tick(tick)
+print(report.is_valid)
+print(report.integrity_hash)
 ```
 
-Run universal tick stream example:
-```bash
-uv run python examples/universal_tick_stream_example.py
-```
+Outputs include SHA-256 integrity signatures and simulation assumptions reporting.
 
 ---
 
-## Market Microstructure Realism & Adverse Execution
+## 11. Overfitting Defense and Statistical Validation
 
-SSBT enforces conservative market microstructure matching rules:
+Built-in functions:
 
-1. **Adverse Match Order**: On intrabar price movements, pending orders match in worst-case adverse priority (evaluating stop-loss triggers before profit target fills).
-2. **Partial Fills**: Fills respects orderbook volume depth (`OrderStatus.PARTIALLY_FILLED`).
-3. **ADV Market Impact**: `ImpactModel(gamma=0.5)` models square-root price impact based on trade volume vs Average Daily Volume.
-4. **Liquidity Cap**: `LiquidityCapModel(max_adv_pct=0.10)` restricts execution volume to a max percentage of bar volume.
-5. **Short Borrow Cost**: `BorrowCostModel(annual_borrow_rate=0.01)` calculates daily short position financing costs.
+- `deflated_sharpe_ratio`
+- `probability_of_backtest_overfitting`
+- `monte_carlo_trade_permutation`
 
----
-
-## Statistical Overfitting Defense Suite (DSR, PBO, Monte Carlo)
-
-Defend your strategy against data mining bias and backtest overfitting:
+Example:
 
 ```python
-from ssbt import deflated_sharpe_ratio, probability_of_backtest_overfitting, monte_carlo_trade_permutation
+from ssbt import (
+    deflated_sharpe_ratio,
+    probability_of_backtest_overfitting,
+    monte_carlo_trade_permutation
+)
 
-# 1. Deflated Sharpe Ratio (DSR)
 dsr_score = deflated_sharpe_ratio(
     observed_sharpe=2.14,
     var_sharpes=0.20,
@@ -262,10 +269,8 @@ dsr_score = deflated_sharpe_ratio(
     returns_len=252,
 )
 
-# 2. Probability of Backtest Overfitting (PBO)
 pbo_score = probability_of_backtest_overfitting(returns_matrix)
 
-# 3. Monte Carlo 1,000-Iteration Resampling Audit
 mc_results = monte_carlo_trade_permutation(
     trade_pnls=trade_pnls,
     initial_cash=5000.0,
@@ -275,182 +280,196 @@ mc_results = monte_carlo_trade_permutation(
 
 ---
 
-## Anti-Lookahead Causality & Point-In-Time Integrity (`AuditLogger`)
+## 12. Reproducibility and Deterministic Reruns
 
-Validate timestamp causality and emit SHA-256 signed audit trails:
+SSBT captures:
 
-```python
-from ssbt import AuditLogger
+- Environment metadata
+- Configuration fingerprints
+- Runtime assumptions
+- Deterministic artifacts
 
-logger = AuditLogger(verbose=False)
-report = logger.generate_report(backtest_result=result["raw_result"], output_dir="artifacts/run_01")
+Rerun command:
 
-print(f"Audit Passed: {report.is_valid}")
-print(f"Integrity Checksum SHA-256: {report.integrity_hash}")
-```
-
----
-
-## Immutable Reproducibility & Rerun Verification
-
-Capture environment snapshots (`environment_snapshot.json`) capturing Git commit SHA, branch, Python environment, platform, random seed, and config hash.
-
-Verify 100% deterministic rerun fidelity:
 ```bash
-uv run python -m ssbt.cli.rerun artifacts/run_20260729_154929
+uv run python -m ssbt.cli.rerun <artifact_dir>
+```
+
+Example:
+
+```bash
+uv run python -m ssbt.cli.rerun artifacts/inst_run_20260728_211537
 ```
 
 ---
 
-## Universal 1-Line Visual Plotting API (`ssbt.plot` & `@ssbt.autoplot`)
+## 13. Real-Time Streaming and IPC
 
-Plot any backtest result, Polars/Pandas DataFrame, or numpy series instantly:
-
-```python
-import ssbt
-
-# Option A: 1-line backtest result plotting (Renders 3-panel strategy dashboard)
-result = adapter.run_backtest(feed, strategy)
-ssbt.plot(result, title="Strategy Performance Dashboard")
-
-# Option B: Dedicated Statistical Robustness Plot
-ssbt.plot_robustness_dashboard(dsr_val=0.98, pbo_val=0.04, mc_res=mc_results)
-
-# Option C: @autoplot decorator on any data/strategy function
-@ssbt.autoplot
-def run_my_strategy():
-    return adapter.run_backtest(feed, strategy)
-```
-
-### Supported Autoplotter Data Types
-| Data Structure | Automatically Generated Plot Type | Output Details |
-| :--- | :--- | :--- |
-| **Backtest Adapter Dict / `BacktestResult`** | **`strategy_dashboard.png`** | 1. Multi-Asset Equity Curves ($) vs Capital Baseline<br>2. Multi-Asset Underwater Drawdown Area Fill (%)<br>3. Per-Trade PnL Sequence ($) |
-| **Statistical Overfitting Metrics** | **`robustness_audit.png`** | 1. DSR % & PBO % Visual Gauges<br>2. Monte Carlo 1,000 Resampling 95% CI Equity Band |
-| **Polars / Pandas DataFrame** | **Price / Quote / Feature Chart** | - OHLCV tables (`close` column): Renders price line chart<br>- Quote tables (`bid`, `ask` columns): Renders bid/ask spread lines |
-
----
-
-## Artifact Output Directory Hierarchy
-
-Every backtest execution writes all 13 institutional run artifacts directly to `artifacts/run_<timestamp>/` and mirrors them **1-to-1** into `artifacts/latest/`:
-
-```
-artifacts/
-├── latest/                          # Directory: 100% exact 1-to-1 mirror of active run folder
-└── run_20260729_154929/              # Directory: Isolated timestamped run folder
-    ├── audit_trail.json             # 1. Anti-lookahead timestamp causality audit report
-    ├── environment_snapshot.json    # 2. Immutable reproducibility snapshot
-    ├── execution_stream.jsonl       # 3. Real-time IPC stream log of engine execution events
-    ├── matrix_equity.png            # 4. Multi-equity comparison chart
-    ├── matrix_results.csv           # 5. Tabular summary across all ticker/timeframe matrix combinations
-    ├── metrics_overview.json        # 6. Detailed metrics overview dictionary
-    ├── overfitting_defense_audit.json # 7. DSR, PBO, and Monte Carlo audit JSON
-    ├── performance_metrics.png      # 8. Dedicated Sharpe, Return %, and Drawdown bar chart comparison
-    ├── robustness_audit.png         # 9. Dedicated DSR %, PBO %, and Monte Carlo 95% CI plot chart
-    ├── simulation_assumptions_report.json # 10. Realism assumptions audit report
-    ├── strategy_dashboard.png       # 11. Clean 3-panel Multi-Asset Strategy Performance Dashboard
-    ├── trade_log.csv                # 12. Itemized trade execution log (CSV)
-    └── trade_log.parquet            # 13. Itemized trade execution log (Parquet)
-```
-
----
-
-## Real-Time IPC Event Streaming & Live Data Ingestion
-
-Stream engine bar events, order submissions, fills, trades, and portfolio equity updates in real-time to high-throughput buffered file sinks, sockets, ring buffers, or custom callbacks:
+Use `ExecutionStreamPublisher` with sinks for file, socket, or custom listeners.
 
 ```python
 from ssbt import ExecutionStreamPublisher, BufferedFileSink, SocketIPCSink
 
-# High-throughput buffered IPC file stream
 publisher = ExecutionStreamPublisher(sinks=[
     BufferedFileSink("artifacts/latest/execution_stream.jsonl", batch_size=500),
     SocketIPCSink(host="127.0.0.1", port=9999)
 ])
 ```
 
-SSBT supports real-time, live market data ingestion from external WebSocket listeners, REST API pollers, ZeroMQ streams, or gRPC connectors using `LiveStreamFeed`. External connectors push live bars, bid/ask quotes, or trade ticks directly into SSBT's real-time engine loop:
-
-```python
-from ssbt import Engine, LiveStreamFeed, QueueOverflowPolicy
-
-# 1. Initialize thread-safe live stream feed
-feed = LiveStreamFeed(
-    symbols="BTCUSD",
-    max_queue_size=100_000,
-    overflow_policy=QueueOverflowPolicy.DISCARD_OLDEST,
-)
-
-# 2. In your external WebSocket/REST client callback thread:
-def on_websocket_quote(data):
-    feed.push_bidask(
-        timestamp=data["timestamp"],
-        symbol=data["symbol"],
-        bid=data["bid"],
-        ask=data["ask"],
-    )
-
-# 3. Execute strategy against live incoming market events
-engine = Engine(feed=feed, strategy=my_live_strategy)
-result = engine.run()
-```
+Supported stream event categories include bar, order, fill, trade, and equity updates.
 
 ---
 
-## Testing & Verification Suite
+## 14. Visualization and Reporting
 
-Run the full pytest suite (155 unit & integration tests):
+Primary plotting entry points:
+
+- `ssbt.plot(result, title=...)`
+- `ssbt.plot_robustness_dashboard(...)`
+- `@ssbt.autoplot`
+
+Generated visuals include:
+
+- Equity curves
+- Drawdowns
+- Performance metrics
+- Robustness diagnostics (DSR/PBO/Monte Carlo summaries)
+
+---
+
+## 15. Artifacts and Output Structure
+
+Each run writes a timestamped folder and mirrors it to `artifacts/latest/`.
+
+Representative outputs:
+
+- `audit_trail.json`
+- `environment_snapshot.json`
+- `execution_stream.jsonl`
+- `metrics_overview.json`
+- `overfitting_defense_audit.json`
+- `simulation_assumptions_report.json`
+- `strategy_dashboard.png`
+- `robustness_audit.png`
+- `trade_log.csv`
+- `trade_log.parquet`
+
+---
+
+## 16. Performance Characteristics
+
+- Throughput target: >1,000,000 bars/sec (core loop conditions dependent)
+- Memory model: Polars + Apache Arrow zero-copy foundations
+- Loop efficiency: pre-allocated Numba-oriented execution paths
+
+---
+
+## 17. CLI Commands
+
+Schema export:
 
 ```bash
-uv run python -m pytest ssbt/tests/ -v
+uv run python -m ssbt schema --out schema.json
+```
+
+Strategy validation:
+
+```bash
+uv run python -m ssbt validate my_strategy.py
+```
+
+Experiment run with machine-readable output:
+
+```bash
+uv run python -m ssbt run experiment.yaml --json
+```
+
+Deterministic rerun:
+
+```bash
+uv run python -m ssbt.cli.rerun <artifact_dir>
 ```
 
 ---
 
-## Performance Notes & Benchmarks
-
-- **Throughput**: >1,000,000 bars/second execution throughput on single-threaded core loop.
-- **Memory Footprint**: Leverages Apache Arrow in-memory zero-copy Polars structures.
-
----
-
-## Public API Reference
+## 18. Public API Reference
 
 ```python
 from ssbt import (
-    # Core Strategy & Engine
     Strategy, Side, Order, OrderType, OrderStatus, Bar, Engine, MultiSymbolEngine,
-    
-    # Data & Feeds
     InMemoryFeed, ParquetFeed, UniversalTickStream, UniversalTickFeed,
     align_multi_timeframe, validate_point_in_time_join,
-    
-    # Backtesting & Adapters
     BacktestAdapter,
-    
-    # Microstructure Realism
     ImpactModel, LiquidityCapModel, BorrowCostModel, RealisticExecutionEngine,
-    
-    # Risk & Capacity
     VolatilityTargetingOverlay, StrategyCapacityAnalyzer,
-    
-    # Overfitting Defenses
     deflated_sharpe_ratio, probability_of_backtest_overfitting, monte_carlo_trade_permutation,
-    
-    # Audit & Reproducibility
     AuditLogger, capture_environment_snapshot, sync_latest_run_folder, ExecutionStreamPublisher,
-    
-    # Plotting & Dashboard API
     plot, autoplot, plot_strategy_dashboard, plot_robustness_dashboard, plot_performance_metrics,
-    
-    # Exception Hierarchy
     SSBTError, DataError, ExecutionError, AuditError,
 )
 ```
 
 ---
 
-## License & Disclaimer
+## 19. Testing and Verification
 
-This project is licensed under the MIT License. SSBT is a quantitative research and backtesting framework intended strictly for educational and empirical analysis purposes. It does not constitute financial advice or investment recommendations.
+Run the full test suite:
+
+```bash
+uv run python -m pytest ssbt/tests/ -v
+```
+
+Deterministic rerun verification:
+
+```bash
+uv run python -m ssbt.cli.rerun artifacts/inst_run_20260728_211537
+```
+
+---
+
+## 20. Design Constraints and Guarantees
+
+Guaranteed architectural constraints:
+
+1. No internal data downloading API.
+2. Conservative adverse execution evaluation.
+3. Partial fill realism supported.
+4. Point-in-time and anti-lookahead integrity checks.
+5. Deterministic rerun pathway.
+6. Statistical overfitting diagnostics included by design.
+
+---
+
+## 21. FAQ
+
+### Does SSBT fetch data from brokers or exchanges?
+No. Market data must be supplied externally.
+
+### Can I use live data?
+Yes. Use `LiveStreamFeed` and push events from your own connectors.
+
+### Does SSBT support anti-lookahead controls?
+Yes. Use `AuditLogger`, timestamp validation, and point-in-time alignment utilities.
+
+### How do I validate robustness?
+Use DSR, PBO, and Monte Carlo permutation tools provided in the package.
+
+---
+
+## 22. Contribution Notes
+
+Scope is currently frozen for net-new features. Contributions should focus on:
+
+- UX and API quality
+- Documentation and examples
+- Error handling and resilience
+- Performance and profiling
+- Test coverage and maintainability
+
+---
+
+## 23. License and Disclaimer
+
+This project is licensed under the MIT License.
+
+SSBT is a quantitative research and backtesting framework for educational and empirical analysis. It is not financial advice and does not guarantee future trading performance.
