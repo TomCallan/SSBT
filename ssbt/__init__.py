@@ -95,6 +95,24 @@ from ssbt.agent import (
     validate_strategy_script,
     get_agent_template,
 )
+from ssbt.service import (
+    run_backtest,
+    run_backtest_async,
+    rerun,
+    compare,
+    BacktestRequest,
+    BacktestResponse,
+    StrategySpec,
+    DataSpec,
+    ExecutionSpec,
+    ResourceLimitSpec,
+    ServiceError,
+    E_DATA_SCHEMA,
+    E_STRATEGY_INIT,
+    E_RESOURCE_LIMIT,
+    E_LOOKAHEAD,
+    E_RUN_NOT_FOUND,
+)
 
 __version__ = "0.5.0"
 
@@ -129,5 +147,10 @@ __all__ = [
     "VolatilityTargetingOverlay", "StrategyCapacityAnalyzer",
     "generate_all_charts", "generate_matrix_heatmap_chart", "generate_multi_equity_curve_chart",
     "display_experiment_summary", "display_backtest_summary", "display_audit_status",
+    # Engine Service Core
+    "run_backtest", "run_backtest_async", "rerun", "compare",
+    "BacktestRequest", "BacktestResponse", "StrategySpec", "DataSpec",
+    "ExecutionSpec", "ResourceLimitSpec", "ServiceError",
+    "E_DATA_SCHEMA", "E_STRATEGY_INIT", "E_RESOURCE_LIMIT", "E_LOOKAHEAD", "E_RUN_NOT_FOUND",
 ]
 
