@@ -20,6 +20,11 @@ from ssbt.service.jobs import (
 from ssbt.service.observability import StageTimer, TraceLogger
 from ssbt.service.rerun import compare, rerun
 from ssbt.service.runner import _compute_config_hash, run_backtest, run_backtest_async
+from ssbt.service.plugins import (
+    PluginManifest,
+    check_plugin_compatibility,
+    dry_run_strategy,
+)
 from ssbt.service.schemas import (
     BacktestRequest,
     BacktestResponse,
@@ -59,4 +64,7 @@ __all__ = [
     "get_agent_tool_spec",
     "TraceLogger",
     "StageTimer",
+    "PluginManifest",
+    "check_plugin_compatibility",
+    "dry_run_strategy",
 ]
