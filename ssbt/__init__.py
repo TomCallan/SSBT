@@ -123,6 +123,16 @@ from ssbt.service import (
     get_agent_tool_spec,
     TraceLogger,
     StageTimer,
+    PluginManifest,
+    check_plugin_compatibility,
+    dry_run_strategy,
+    ExecutionProfile,
+    ProfileConfig,
+    apply_execution_profile,
+    FeedCache,
+    TenantContext,
+    resolve_tenant_artifact_dir,
+    validate_tenant_policy,
 )
 
 __version__ = "0.5.0"
@@ -165,5 +175,8 @@ __all__ = [
     "E_DATA_SCHEMA", "E_STRATEGY_INIT", "E_RESOURCE_LIMIT", "E_LOOKAHEAD", "E_RUN_NOT_FOUND",
     "JobManager", "JobStatus", "JobInfo", "start_job", "get_job_status", "cancel_job", "subscribe_job_stream",
     "explain_failure", "get_agent_tool_spec", "TraceLogger", "StageTimer",
+    "PluginManifest", "check_plugin_compatibility", "dry_run_strategy",
+    "ExecutionProfile", "ProfileConfig", "apply_execution_profile", "FeedCache",
+    "TenantContext", "resolve_tenant_artifact_dir", "validate_tenant_policy",
 ]
 
