@@ -62,7 +62,56 @@ uv sync
 
 ---
 
-## Quickstart (10-Minute Path to First Backtest)
+## ⚡ 1-Line Quickstart for Humans (Instant Prototyping)
+
+For rapid strategy exploration, SSBT provides top-level ergonomic helpers and synthetic data generation:
+
+```python
+import ssbt
+
+# 1. Generate realistic synthetic market bars in 1 line
+data = ssbt.generate_synthetic_bars(n_bars=1000, seed=42)
+
+# 2. Write strategy logic as a simple decorator or class
+@ssbt.strategy
+def momentum_strategy(bar, engine):
+    if bar.close > bar.open:
+        engine.submit_order(ssbt.Strategy.market_order(bar.symbol, ssbt.Side.BUY, 1.0))
+
+# 3. Run backtest and view rich metrics in 1 line
+result = ssbt.quick_backtest(momentum_strategy, data, symbol="BTC-USD", verbose=True)
+
+# Access performance statistics directly
+print(f"Total Return: {result.total_return:.2%}, Sharpe Ratio: {result.sharpe_ratio:.2f}")
+```
+
+---
+
+## 🤖 AI Agent & Automation Tooling
+
+SSBT includes built-in tools for AI coding agents and programmatic pipelines:
+
+- **JSON Schema Emission**: Inspect experiment specification requirements programmatically:
+  ```bash
+  uv run python -m ssbt schema --out schema.json
+  ```
+- **Static Strategy Validation**: Validate Python strategy AST for syntax errors, missing methods, or lookahead operations:
+  ```bash
+  uv run python -m ssbt validate my_strategy.py
+  ```
+- **Machine-Readable Experiment Runs**: Execute experiments with structured JSON output:
+  ```bash
+  uv run python -m ssbt run experiment.yaml --json
+  ```
+- **Code Templates**: Get standard canonical strategy templates directly from Python or CLI:
+  ```python
+  import ssbt
+  template_code = ssbt.get_agent_template("sma_cross")
+  ```
+
+---
+
+## Standard Backtesting Setup
 
 Here is a complete, minimal example running a moving-average crossover strategy over Polars market data:
 

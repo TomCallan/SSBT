@@ -84,6 +84,18 @@ from ssbt.experiments.charts import (
     generate_multi_equity_curve_chart,
 )
 
+from ssbt.quick import (
+    quick_backtest,
+    QuickResult,
+    strategy,
+    generate_synthetic_bars,
+)
+from ssbt.agent import (
+    get_experiment_schema,
+    validate_strategy_script,
+    get_agent_template,
+)
+
 __version__ = "0.5.0"
 
 __all__ = [
@@ -98,6 +110,9 @@ __all__ = [
     "walk_forward", "WalkForwardResult", "WalkForwardWindow",
     "BaseOptimizer", "GridSearch",
     "compute_metrics", "format_metrics", "HAS_NUMBA",
+    # Ergonomics & Agent Tooling
+    "quick_backtest", "QuickResult", "strategy", "generate_synthetic_bars",
+    "get_experiment_schema", "validate_strategy_script", "get_agent_template",
     # Exploration Engine & Plugins
     "BaseEvent", "BaseOutcome", "ExperimentSpec",
     "load_experiment", "LoaderError",
@@ -115,3 +130,4 @@ __all__ = [
     "generate_all_charts", "generate_matrix_heatmap_chart", "generate_multi_equity_curve_chart",
     "display_experiment_summary", "display_backtest_summary", "display_audit_status",
 ]
+
