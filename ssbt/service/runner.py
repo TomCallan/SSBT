@@ -23,10 +23,16 @@ from ssbt.service.errors import (
     ServiceError,
 )
 from ssbt.service.observability import StageTimer, TraceLogger
+from ssbt.service.profiles import ExecutionProfile, FeedCache, apply_execution_profile
 from ssbt.service.schemas import (
     BacktestRequest,
     BacktestResponse,
     StrategySpec,
+)
+from ssbt.service.tenancy import (
+    TenantContext,
+    resolve_tenant_artifact_dir,
+    validate_tenant_policy,
 )
 
 
@@ -135,13 +141,46 @@ def _instantiate_strategy(spec: StrategySpec) -> ssbt.Strategy:
         )
 
 
-def run_backtest(request: BacktestRequest) -> BacktestResponse:
+def run_backtest(
+    request: BacktestRequest,
+    context: TenantContext | None = None,
+    profile: ExecutionProfile | str | None = None,
+) -> BacktestResponse:
     """Execute synchronous backtest service workflow."""
     with StageTimer() as total_timer:
         run_id = request.run_id or f"run_{uuid.uuid4().hex[:12]}"
         config_hash = _compute_config_hash(request)
         logger = TraceLogger(run_id=run_id)
         logger.log("info", "backtest_start", config_hash=config_hash)
+
+        # 0. Validate tenant policy
+        try:
+            validate_tenant_policy(request, context)
+        except ServiceError as se:
+            return BacktestResponse(
+                status="failed",
+                run_id=run_id,
+                config_hash=config_hash,
+                error=se.to_spec(),
+            )
+
+        # Apply execution profile if specified
+        selected_profile = profile or getattr(request.execution, "profile", None)
+        if selected_profile is not None:
+            try:
+                request = apply_execution_profile(request, selected_profile)
+            except Exception as e:
+                return BacktestResponse(
+                    status="failed",
+                    run_id=run_id,
+                    config_hash=config_hash,
+                    error=ServiceError(
+                        code=E_STRATEGY_INIT,
+                        message=f"Invalid execution profile '{selected_profile}': {e}",
+                        hint=f"Use one of {[p.value for p in ExecutionProfile]}",
+                        details={"error": str(e)},
+                    ).to_spec(),
+                )
 
         # 1. Validate data input
         with StageTimer() as data_prep_timer:
@@ -157,7 +196,9 @@ def run_backtest(request: BacktestRequest) -> BacktestResponse:
                     ).to_spec(),
                 )
 
-            df: pl.DataFrame | None = None
+            symbol = request.data.symbol or "ASSET"
+            feed: InMemoryFeed | None = None
+
             if request.data.parquet_path is not None:
                 p_path = Path(request.data.parquet_path)
                 if not p_path.exists():
@@ -172,7 +213,7 @@ def run_backtest(request: BacktestRequest) -> BacktestResponse:
                         ).to_spec(),
                     )
                 try:
-                    df = pl.read_parquet(p_path)
+                    feed = FeedCache.get_or_load(p_path, symbol=symbol)
                 except Exception as e:
                     return BacktestResponse(
                         status="failed",
@@ -207,6 +248,7 @@ def run_backtest(request: BacktestRequest) -> BacktestResponse:
                                 hint="Pass a Polars DataFrame, Pandas DataFrame, or dict",
                             ).to_spec(),
                         )
+                    feed = FeedCache.get_or_load(df, symbol=symbol)
                 except Exception as e:
                     return BacktestResponse(
                         status="failed",
@@ -220,7 +262,7 @@ def run_backtest(request: BacktestRequest) -> BacktestResponse:
                         ).to_spec(),
                     )
 
-            if df is None or df.is_empty():
+            if feed is None or feed.n_bars == 0:
                 return BacktestResponse(
                     status="failed",
                     run_id=run_id,
@@ -229,28 +271,6 @@ def run_backtest(request: BacktestRequest) -> BacktestResponse:
                         code=E_DATA_SCHEMA,
                         message="Provided data is empty (0 rows)",
                         hint="Provide a dataset containing at least 1 row of market data",
-                    ).to_spec(),
-                )
-
-            # Convert timestamp column to int epoch milliseconds if datetime/date
-            if "timestamp" in df.columns:
-                dtype = df["timestamp"].dtype
-                if isinstance(dtype, (pl.Datetime, pl.Date)) or dtype in (pl.Datetime, pl.Date):
-                    df = df.with_columns(pl.col("timestamp").dt.epoch("ms"))
-
-            symbol = request.data.symbol or "ASSET"
-            try:
-                feed = InMemoryFeed(df, symbol=symbol)
-            except Exception as e:
-                return BacktestResponse(
-                    status="failed",
-                    run_id=run_id,
-                    config_hash=config_hash,
-                    error=ServiceError(
-                        code=E_DATA_SCHEMA,
-                        message=f"Invalid market data schema: {e}",
-                        hint="Ensure DataFrame contains timestamp, open, high, low, close, volume (or timestamp, bid, ask)",
-                        details={"error": str(e)},
                     ).to_spec(),
                 )
         data_prep_ms = data_prep_timer.elapsed_ms()
@@ -324,7 +344,7 @@ def run_backtest(request: BacktestRequest) -> BacktestResponse:
         metrics_ms = metrics_timer.elapsed_ms()
 
         # 6. Artifact creation
-        artifact_dir = Path("artifacts") / run_id
+        artifact_dir = resolve_tenant_artifact_dir(context, run_id)
         artifact_dir.mkdir(parents=True, exist_ok=True)
 
         request_file = artifact_dir / "request.json"
@@ -378,8 +398,14 @@ def run_backtest(request: BacktestRequest) -> BacktestResponse:
         return response
 
 
-async def run_backtest_async(request: BacktestRequest) -> BacktestResponse:
+async def run_backtest_async(
+    request: BacktestRequest,
+    context: TenantContext | None = None,
+    profile: ExecutionProfile | str | None = None,
+) -> BacktestResponse:
     """Execute asynchronous backtest service workflow in an executor thread."""
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, run_backtest, request)
+    return await loop.run_in_executor(
+        None, lambda: run_backtest(request, context=context, profile=profile)
+    )
 

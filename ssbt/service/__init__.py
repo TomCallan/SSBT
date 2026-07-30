@@ -34,6 +34,18 @@ from ssbt.service.schemas import (
     StrategySpec,
 )
 
+from ssbt.service.profiles import (
+    ExecutionProfile,
+    FeedCache,
+    ProfileConfig,
+    apply_execution_profile,
+)
+from ssbt.service.tenancy import (
+    TenantContext,
+    resolve_tenant_artifact_dir,
+    validate_tenant_policy,
+)
+
 __all__ = [
     "E_DATA_SCHEMA",
     "E_STRATEGY_INIT",
@@ -67,4 +79,11 @@ __all__ = [
     "PluginManifest",
     "check_plugin_compatibility",
     "dry_run_strategy",
+    "ExecutionProfile",
+    "ProfileConfig",
+    "apply_execution_profile",
+    "FeedCache",
+    "TenantContext",
+    "resolve_tenant_artifact_dir",
+    "validate_tenant_policy",
 ]

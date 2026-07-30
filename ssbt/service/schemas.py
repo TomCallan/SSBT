@@ -26,6 +26,11 @@ class ExecutionSpec:
     impact_model: str | None = None
     borrow_cost: float = 0.0
     safe_mode: bool = True
+    enable_microstructure: bool = False
+    enable_overfitting_defense: bool = False
+    enable_ipc_stream: bool = False
+    profile: str | None = None
+
 
 
 @dataclass
