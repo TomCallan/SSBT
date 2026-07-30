@@ -1,3 +1,4 @@
+from ssbt.service.diagnostics import explain_failure, get_agent_tool_spec
 from ssbt.service.errors import (
     E_DATA_SCHEMA,
     E_LOOKAHEAD,
@@ -53,5 +54,8 @@ __all__ = [
     "get_job_status",
     "cancel_job",
     "subscribe_job_stream",
+    "explain_failure",
+    "get_agent_tool_spec",
 ]
+
 

@@ -112,6 +112,8 @@ from ssbt.service import (
     E_RESOURCE_LIMIT,
     E_LOOKAHEAD,
     E_RUN_NOT_FOUND,
+    explain_failure,
+    get_agent_tool_spec,
 )
 
 __version__ = "0.5.0"
@@ -152,5 +154,6 @@ __all__ = [
     "BacktestRequest", "BacktestResponse", "StrategySpec", "DataSpec",
     "ExecutionSpec", "ResourceLimitSpec", "ServiceError",
     "E_DATA_SCHEMA", "E_STRATEGY_INIT", "E_RESOURCE_LIMIT", "E_LOOKAHEAD", "E_RUN_NOT_FOUND",
+    "explain_failure", "get_agent_tool_spec",
 ]
 
