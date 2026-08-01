@@ -1,0 +1,9 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include ssbt/py.typed
+recursive-include ssbt *.pyi
+recursive-exclude ssbt/tests *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+global-exclude *.egg-info

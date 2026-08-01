@@ -1,29 +1,75 @@
 [project]
 name = "ssbt"
-version = "0.3.0"
-description = "Super Simple Backtesting Tool — minimal, performant, event-driven"
+version = "0.5.0"
+description = "Super Speedy Backtesting Tool — event-driven, market-accurate quantitative research & exploration engine"
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.10"
+authors = [
+    { name = "Tom Callan" },
+]
+keywords = ["backtesting", "quantitative-finance", "algorithmic-trading", "event-driven"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
+]
 dependencies = [
     "polars>=0.20",
     "numpy>=1.24",
     "matplotlib>=3.7",
     "numba>=0.66.0",
-    "yfinance>=1.5.2",
 ]
 
 [project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "yfinance>=1.5.2",
+]
 test = ["pytest>=7.0"]
 fast = ["numba>=0.58"]
 
+[project.urls]
+Repository = "https://github.com/TomCallan/SSBT"
+"Bug Tracker" = "https://github.com/TomCallan/SSBT/issues"
+
 [project.scripts]
 ssbt = "ssbt.cli:main"
-ssbt-run = "ssbt.cli:main"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["*"]
-exclude = ["tests*", "docs*", "examples*", "artifacts*"]
+include = ["ssbt*"]
+exclude = ["ssbt.tests*", "ssbt.tests.benchmark*"]
+
+[tool.setuptools.package-data]
+ssbt = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["ssbt/tests"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[dependency-groups]
+dev = [
+    "twine>=7.0.0",
+]

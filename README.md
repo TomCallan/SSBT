@@ -6,6 +6,8 @@ You bring your data. You write your strategy. SSBT runs it against realistic mar
 
 No config files. No YAML. No JSON DSL. Just Python.
 
+> **AI Agent Reference / Context7**: Comprehensive agent-ready API reference available in [`docs/CONTEXT7.md`](docs/CONTEXT7.md).
+
 ---
 
 ## Install
