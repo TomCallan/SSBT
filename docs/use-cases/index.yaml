@@ -1,0 +1,76 @@
+# Machine-Readable Use Case Index
+
+---
+# SSBT Use Case Registry
+- id: single-asset-mean-reversion
+  title: Single-Asset Mean Reversion Strategy
+  intent_tags: [mean-reversion, bollinger-bands, z-score, atr-sizing, stop-loss]
+  apis_used: [ssbt.Strategy, ssbt.Engine, ssbt.InMemoryFeed, OrderType.LIMIT]
+  artifacts_emitted: [backtest_result.json, equity_curve.csv, audit_log.json]
+  risk_controls: [atr_trailing_stop, max_position_cap]
+  runtime_profile: fast
+  script_path: strategies_vault/volatility_mean_reversion.py
+
+- id: multi-timeframe-signal-alignment
+  title: Multi-Timeframe Signal Alignment & PIT Merging
+  intent_tags: [multi-timeframe, point-in-time, asof-join, lookahead-prevention]
+  apis_used: [ssbt.data.align_multi_timeframe, ssbt.data.validate_point_in_time_join]
+  artifacts_emitted: [pit_join_validation_report.json, aligned_bars.parquet]
+  risk_controls: [timestamp_monotonicity_check, zero_lookahead_invariant]
+  runtime_profile: balanced
+  script_path: ssbt/data/point_in_time.py
+
+- id: event-driven-live-streaming
+  title: Event-Driven Live IPC Streaming & GUI Sink
+  intent_tags: [live-streaming, ipc, socket-sink, ring-buffer, realtime-gui]
+  apis_used: [ssbt.analytics.ExecutionStreamPublisher, ssbt.analytics.SocketIPCSink, ssbt.analytics.RingBufferIPCSink]
+  artifacts_emitted: [ipc_stream_events.bin, live_telemetry.json]
+  risk_controls: [overflow_buffer_policy, zero_copy_serialization]
+  runtime_profile: max_fidelity
+  script_path: ssbt/analytics/ipc_stream.py
+
+- id: market-microstructure-stress-test
+  title: Market Microstructure Stress Test & Partial Fills
+  intent_tags: [orderbook, l2-depth, partial-fills, conservative-matching]
+  apis_used: [ssbt.data.rebuild_orderbook_from_bars, ssbt.data.OrderBookEngine, OrderStatus.PARTIALLY_FILLED]
+  artifacts_emitted: [orderbook_fill_log.json, depth_snapshot.csv]
+  risk_controls: [worst_case_adverse_execution, order_book_liquidity_cap]
+  runtime_profile: max_fidelity
+  script_path: ssbt/data/orderbook.py
+
+- id: capacity-and-impact-study
+  title: Strategy Capacity & Square-Root Impact Study
+  intent_tags: [capacity-analysis, market-impact, adv-cap, borrow-cost]
+  apis_used: [ssbt.portfolio.StrategyCapacityAnalyzer, ssbt.execution.ImpactModel, ssbt.execution.LiquidityCapModel]
+  artifacts_emitted: [capacity_curve_report.json, sharpe_decay_chart.png]
+  risk_controls: [adv_participation_cap, slippage_tolerance]
+  runtime_profile: balanced
+  script_path: ssbt/portfolio/capacity.py
+
+- id: overfitting-defense-workflow
+  title: Statistical Overfitting Defense (DSR / PBO / Monte Carlo)
+  intent_tags: [overfitting, deflated-sharpe, pbo, monte-carlo, quantitative-due-diligence]
+  apis_used: [ssbt.analytics.deflated_sharpe_ratio, ssbt.analytics.probability_of_backtest_overfitting, ssbt.analytics.monte_carlo_trade_permutation]
+  artifacts_emitted: [overfitting_defense_report.json, pbo_distribution.png]
+  risk_controls: [multiple_testing_correction, non_normality_adjustment]
+  runtime_profile: fast
+  script_path: ssbt/analytics/overfitting.py
+
+- id: deterministic-rerun-and-audit
+  title: Deterministic Rerun & Point-In-Time Audit
+  intent_tags: [reproducibility, sha256-signature, audit-logger, deterministic-rerun]
+  apis_used: [ssbt.analytics.AuditLogger, ssbt.cli.rerun, ssbt.capture_environment_snapshot]
+  artifacts_emitted: [environment_snapshot.json, simulation_assumptions_report.json, audit_trail.jsonl]
+  risk_controls: [immutable_sha256_verifier, causality_audit]
+  runtime_profile: fast
+  script_path: ssbt/cli/rerun.py
+
+- id: strategy-comparison-lab
+  title: Strategy Comparison & Multi-Metric Evaluation Lab
+  intent_tags: [strategy-comparison, benchmark, metrics-dashboard, walk-forward]
+  apis_used: [ssbt.service.compare, ssbt.optimization.WalkForwardOptimizer, ssbt.analytics.plot_strategy_dashboard]
+  artifacts_emitted: [comparison_summary.json, multi_strategy_equity.png]
+  risk_controls: [out_of_sample_validation, drawdown_cap]
+  runtime_profile: balanced
+  script_path: ssbt/service/runner.py
+---
